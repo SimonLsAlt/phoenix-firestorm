@@ -5590,7 +5590,18 @@
 				<menu_item_call.on_click
 				 function="Advanced.ReloadAvatarCloudParticle" />
 			</menu_item_call>
-		</menu>
+            <menu_item_call
+             label="AI Chat"
+             name="AI Chat">
+                <menu_item_call.on_click
+                 function="Floater.Show"
+                 parameter="ai_chat" />
+                <menu_item_call.on_enable
+                 function="Floater.CanShow"
+                 parameter="ai_chat" />
+            </menu_item_call>
+
+        </menu>
         <menu_item_separator/>
 
         <menu_item_check

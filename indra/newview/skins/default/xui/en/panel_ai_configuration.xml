@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel
+ border="true"
+ follows="top|left"
+ height="450"
+ help_topic="panel_ai_configuration_tab"
+ label="Config"
+ layout="topleft"
+ left="0"
+ name="AIConfiguration"
+ top="320"
+ width="485">
+    <text
+     type="string"
+     length="1"
+     font="SansSerif"
+     follows="left|top"
+     height="32"
+     layout="topleft"
+     left="10"
+     top="14"
+     word_wrap="true"
+     name="ai_configuration_help_text"
+     >
+        Information here determines what AI system is used for IM chat responses.
+    </text>
+
+    <check_box
+     follows="top"
+     height="23"
+     label="Enable AI-based chat"
+     layout="topleft"
+     left="20"
+     name="enable_ai_chat"
+     tool_tip="Checking this box will use an AI service for IM chat"
+     top_delta="40"
+     width="278" />
+
+    <text
+     type="string"
+     length="1"
+     font="SansSerif"
+     follows="top"
+     top_pad="22"
+     height="23"
+     layout="topleft"
+     left="20"
+     name="ai_service"
+     width="120">
+        AI chat service:
+    </text>
+    <combo_box
+     enabled="true"
+     height="23"
+     follows="left|top"
+     left_pad="10"
+     name="ai service"
+     visible="true"
+     width="120">
+        <combo_box.item
+         label="Kindroid.ai"
+         name="item0"
+         value="Kindroid.ai" />
+        <combo_box.item
+         label="Nomi.ai"
+         name="item1"
+         value="Nomi.ai" />
+        <combo_box.item
+         label="OpenAI"
+         name="item3"
+         value="OpenAI" />
+    </combo_box>
+
+    <text
+     type="string"
+     length="1"
+     font="SansSerif"
+     follows="top"
+     top_pad="12"
+     height="23"
+     layout="topleft"
+     left="20"
+     name="ai_endpoint"
+     width="120">
+        API Endpoint:
+    </text>
+    <line_editor
+     border_style="line"
+     border_thickness="1"
+     font="SansSerif"
+     follows="left|top"
+     left_pad="10"
+     height="23"
+     layout="topleft"
+     max_length_bytes="1024"
+     name="ai_endpoint_value"
+     width="320" />
+
+    <text
+     type="string"
+     length="1"
+     font="SansSerif"
+     follows="top"
+     top_pad="12"
+     height="23"
+     layout="topleft"
+     left="20"
+     name="ai_api_key"
+     width="120">
+        API Key:
+    </text>
+    <line_editor
+     border_style="line"
+     border_thickness="1"
+     font="SansSerif"
+     follows="left|top"
+     left_pad="10"
+     height="23"
+     layout="topleft"
+     max_length_bytes="256"
+     name="ai_api_key_value"
+     width="320" />
+
+    <text
+     type="string"
+     length="1"
+     font="SansSerif"
+     follows="top"
+     top_pad="12"
+     height="23"
+     layout="topleft"
+     left="20"
+     name="ai_character_id"
+     width="120">
+        Character ID:
+    </text>
+    <line_editor
+     border_style="line"
+     border_thickness="1"
+     font="SansSerif"
+     follows="left|top"
+     left_pad="10"
+     height="23"
+     layout="topleft"
+     max_length_bytes="256"
+     name="ai_character_id_value"
+     width="320" />
+
+    <button
+     enabled="true"
+     follows="top"
+     top_pad="12"
+     layout="topleft"
+     left="20"
+     height="24"
+     label="Apply"
+     name="apply_btn"
+     width="97" />
+</panel>

@@ -2542,6 +2542,18 @@ class LLAdvancedReloadAvatarCloudParticle : public view_listener_t
     }
 };
 
+///////////////////////////////////
+// Show AI chat window           //
+///////////////////////////////////
+class LLAdvancedAIChat : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LL_INFOS("AIChat") << "handleEvent called:  " << userdata << LL_ENDL;
+        return true;
+    }
+};
+
 /////////////////
 // MESSAGE LOG //
 /////////////////
@@ -12865,6 +12877,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedDebugAvatarTextures(), "Advanced.DebugAvatarTextures");
     view_listener_t::addMenu(new LLAdvancedDumpAvatarLocalTextures(), "Advanced.DumpAvatarLocalTextures");
     view_listener_t::addMenu(new LLAdvancedReloadAvatarCloudParticle(), "Advanced.ReloadAvatarCloudParticle");
+    view_listener_t::addMenu(new LLAdvancedAIChat(), "Advanced.AIChat");
 
     // Advanced > Network
     view_listener_t::addMenu(new LLAdvancedEnableMessageLog(), "Advanced.EnableMessageLog");
