@@ -36,7 +36,6 @@
 #include "llfloater360capture.h"
 #include "llfloaterabout.h"
 #include "llfloateraddpaymentmethod.h"
-#include "llfloateraichat.h"
 #include "llfloaterauction.h"
 #include "llfloaterautoreplacesettings.h"
 #include "llfloateravatar.h"
@@ -195,6 +194,7 @@
 #include "floatermedialists.h"
 #include "fsareasearch.h"
 #include "fsfloateraddtocontactset.h"
+#include "fsfloateraichat.h"
 #include "fsfloaterassetblacklist.h"
 #include "fsfloateravatarrendersettings.h"
 #include "fsfloatercontacts.h"
@@ -618,7 +618,7 @@ void LLViewerFloaterReg::registerFloaters()
 
     // *NOTE: Please keep these alphabetized for easier merges
     // ND: And for FS please put yours after this line, for easier merges too
-    LLFloaterReg::add("ai_chat", "floater_ai_bots.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterAIChat>);
+    LLFloaterReg::add("ai_chat", "floater_ai_chat.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterAIChat>);
 
     LLFloaterReg::add("animation_explorer", "floater_animation_explorer.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<AnimationExplorer>);
     LLFloaterReg::add("animation_overrider", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);

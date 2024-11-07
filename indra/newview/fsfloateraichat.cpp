@@ -1,6 +1,6 @@
 /**
- * @file llfloateraichat.cpp
- * @author SimonLsAlt
+ * @file fsfloateraichat.cpp
+ * @author simonlsalt
  * @brief Floating window for AI bot control
  *
  * $LicenseInfo:firstyear=2024&license=viewerlgpl$
@@ -25,7 +25,7 @@
  */
 
 #include "llviewerprecompiledheaders.h"
-#include "llfloateraichat.h"
+#include "fsfloateraichat.h"
 
 
 #include "llfloater.h"

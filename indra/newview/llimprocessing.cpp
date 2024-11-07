@@ -71,6 +71,7 @@
 
 // Firestorm includes
 #include "exogroupmutelist.h"
+#include "fsaichatmgr.h"
 #include "fscommon.h"
 #include "fsdata.h"
 #include "fskeywords.h"
@@ -1004,6 +1005,13 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     }
                     // </FS:PP>
 
+                    // <FS:AI chat>
+                    LL_INFOS("AIChat") << "IM_NOTHING_SPECIAL session_id( " << session_id << " ), from_id( " << from_id << " )"
+                                       << ", name " << name << ", message: " << message << LL_ENDL;
+                    // route message for AI chat processing
+                    FSAIChatMgr::getInstance()->processIncomingChat(from_id, message, name, session_id);
+                    // </FS:AI chat>
+
                     buffer = saved + message;
 
                     bool region_message = false;
@@ -1112,12 +1120,12 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     item_name = std::string((*(iter++)).c_str());
                     // Note There is more elements in 'tokens' ...
 
-
-                    for (int i = 0; i < 6; i++)
-                    {
-                        LL_WARNS() << *(iter++) << LL_ENDL;
-                        iter++;
-                    }
+                    // https://feedback.secondlife.com/bug-reports/p/remove-code-making-cryptic-and-frequent-messages-in-viewer-logs
+                    //for (int i = 0; i < 6; i++)
+                    //{
+                    //    LL_WARNS() << *(iter++) << LL_ENDL;
+                    //    iter++;
+                    //}
                 }
             }
             else

@@ -1,6 +1,6 @@
 /**
- * @file llfloateraichat.h
- * @author SimonLsAlt
+ * @file fsfloateraichat.h
+ * @author simonlsalt
  * @brief Floating window for AI chat control
  *
  * $LicenseInfo:firstyear=2024&license=viewerlgpl$
@@ -24,8 +24,8 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLFLOATERAICHAT_H
-#define LL_LLFLOATERAICHAT_H
+#ifndef FS_FSFLOATERAICHAT_H
+#define FS_FSFLOATERAICHAT_H
 
 #include <vector>
 #include "llagent.h"

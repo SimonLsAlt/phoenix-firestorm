@@ -97,6 +97,7 @@ set(viewer_SOURCE_FILES
     exoflickrauth.cpp
     exogroupmutelist.cpp
     floatermedialists.cpp
+    fsaichatmgr.cpp
     fsareasearch.cpp
     fsareasearchmenu.cpp
     fsassetblacklist.cpp
@@ -112,6 +113,7 @@ set(viewer_SOURCE_FILES
     fsdroptarget.cpp
     fsexportperms.cpp
     fsfloateraddtocontactset.cpp
+    fsfloateraichat.cpp
     fsfloaterassetblacklist.cpp
     fsfloateravatarrendersettings.cpp
     fsfloaterblocklist.cpp
@@ -293,7 +295,6 @@ set(viewer_SOURCE_FILES
     llfloaterabout.cpp
     llfloaterbvhpreview.cpp
     llfloateraddpaymentmethod.cpp
-    llfloateraichat.cpp
     llfloaterauction.cpp
     llfloaterautoreplacesettings.cpp
     llfloateravatar.cpp
@@ -907,6 +908,7 @@ set(viewer_HEADER_FILES
     exoflickrauth.h
     exogroupmutelist.h
     floatermedialists.h
+    fsaichatmgr.h
     fsareasearch.h
     fsareasearchmenu.h
     fsassetblacklist.h
@@ -923,6 +925,7 @@ set(viewer_HEADER_FILES
     fsdroptarget.h
     fsexportperms.h
     fsfloateraddtocontactset.h
+    fsfloateraichat.h
     fsfloaterassetblacklist.h
     fsfloateravatarrendersettings.h
     fsfloaterblocklist.h
@@ -1102,7 +1105,6 @@ set(viewer_HEADER_FILES
     llflexibleobject.h
     llfloater360capture.h
     llfloaterabout.h
-    llfloateraichat.h
     llfloaterbvhpreview.h
     llfloateraddpaymentmethod.h
     llfloaterauction.h
