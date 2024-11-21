@@ -22,38 +22,26 @@
      word_wrap="true"
      name="ai_configuration_help_text"
      >
-        Information here determines what AI system is used for IM chat responses.
+        Enable, select and configure an AI service for IM chat responses.
     </text>
 
     <check_box
      follows="top"
      height="23"
-     label="Enable AI-based chat"
+     label="Enable AI-based chat service:  "
      layout="topleft"
      left="20"
      name="enable_ai_chat"
      tool_tip="Checking this box will use an AI service for IM chat"
-     top_delta="40"
-     width="278" />
+     top_delta="32"
+     width="182" />
 
-    <text
-     type="string"
-     length="1"
-     font="SansSerif"
-     follows="top"
-     top_pad="22"
-     height="23"
-     layout="topleft"
-     left="20"
-     name="ai_service"
-     width="120">
-        AI chat service:
-    </text>
     <combo_box
      enabled="true"
      height="23"
      follows="left|top"
-     left_pad="10"
+     top_pad="-21"
+     left_pad="2"
      name="ai service"
      visible="true"
      width="120">
@@ -69,14 +57,27 @@
          label="OpenAI"
          name="item3"
          value="OpenAI" />
+        <combo_box.item
+         label="LM Studio"
+         name="item4"
+         value="LMStudio" />
     </combo_box>
+
+    <view_border
+     bevel_style="none"
+     follows="top"
+     height="360"
+     layout="topleft"
+     left="6"
+     top_pad="8"
+     width="470" />
 
     <text
      type="string"
      length="1"
      font="SansSerif"
      follows="top"
-     top_pad="12"
+     top_pad="-350"
      height="23"
      layout="topleft"
      left="20"
@@ -155,5 +156,6 @@
      height="24"
      label="Apply"
      name="apply_btn"
-     width="97" />
+     width="97">
+    </button>
 </panel>

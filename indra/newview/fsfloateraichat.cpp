@@ -25,44 +25,59 @@
  */
 
 #include "llviewerprecompiledheaders.h"
+
 #include "fsfloateraichat.h"
+#include "fsaichatmgr.h"
 
-
+#include "llcheckboxctrl.h"
+#include "llcombobox.h"
+#include "lldispatcher.h"
 #include "llfloater.h"
+#include "lllineeditor.h"
 #include "llpanel.h"
 #include "lltabcontainer.h"
+#include "lltexteditor.h"
+#include "lltrans.h"
 #include "llviewerregion.h"
-
-#include "lldispatcher.h"
 #include "lluictrl.h"
-#include "llviewerregion.h"
 
 
 // -----------------------------------------------------------------------------
-// class LLFloaterAIChat
+// class FSFloaterAIChat
 
-void LLFloaterAIChat::onOpen(const LLSD& key)
+static FSFloaterAIChat* sAIChatFloater = nullptr;
+
+// static
+FSFloaterAIChat* FSFloaterAIChat::getAIChatFloater()
+{
+    return sAIChatFloater;
+}
+
+
+void FSFloaterAIChat::onOpen(const LLSD& key)
 {
     // Placeholder for onOpen logic
+    sAIChatFloater = this;
 }
 
-void LLFloaterAIChat::onClose(bool app_quitting)
+void FSFloaterAIChat::onClose(bool app_quitting)
 {
     // Placeholder for onClose logic
+    sAIChatFloater = nullptr;
 }
 
-bool LLFloaterAIChat::postBuild()
+bool FSFloaterAIChat::postBuild()
 {
     mTab = getChild<LLTabContainer>("ai_bots_panels");
-    mTab->setCommitCallback(boost::bind(&LLFloaterAIChat::onTabSelected, this, _2));
+    mTab->setCommitCallback(boost::bind(&FSFloaterAIChat::onTabSelected, this, _2));
 
     // contruct the panels
-    LLPanelAIInfo* panel = new LLPanelAIConfiguration;
+    FSPanelAIInfo* panel = new FSPanelAIConfiguration;
     mAIInfoPanels.push_back(panel);
     panel->buildFromFile("panel_ai_configuration.xml");
     mTab->addTabPanel(LLTabContainer::TabPanelParams().panel(panel).select_tab(true));
 
-    panel = new LLPanelAIConversation;
+    panel = new FSPanelAIConversation;
     mAIInfoPanels.push_back(panel);
     panel->buildFromFile("panel_ai_conversation.xml");
     mTab->addTabPanel(panel);
@@ -70,51 +85,53 @@ bool LLFloaterAIChat::postBuild()
     return true;  // Assuming success for placeholder
 }
 
-// static
-LLPanelAIConfiguration* LLFloaterAIChat::getPanelConfiguration()
+FSPanelAIConfiguration* FSFloaterAIChat::getPanelConfiguration()
 {
     // Placeholder for getPanelConfiguration logic
+    if (mAIInfoPanels.size() > 0)
+        return dynamic_cast<FSPanelAIConfiguration*>(mAIInfoPanels[0]);
     return nullptr;  // Return nullptr as a placeholder
 }
 
-// static
-LLPanelAIConversation* LLFloaterAIChat::getPanelConversation()
+FSPanelAIConversation* FSFloaterAIChat::getPanelConversation()
 {
     // Placeholder for getPanelConversation logic
+    if (mAIInfoPanels.size() > 1)
+        return dynamic_cast<FSPanelAIConversation*>(mAIInfoPanels[1]);
     return nullptr;  // Return nullptr as a placeholder
 }
 
-void LLFloaterAIChat::refresh()
+void FSFloaterAIChat::refresh()
 {
     // Placeholder for refresh logic
 }
 
-LLFloaterAIChat::LLFloaterAIChat(const LLSD& seed) : LLFloater(seed)
+FSFloaterAIChat::FSFloaterAIChat(const LLSD& seed) : LLFloater(seed)
 {
     // Placeholder for constructor logic
 }
 
-LLFloaterAIChat::~LLFloaterAIChat()
+FSFloaterAIChat::~FSFloaterAIChat()
 {
     // Placeholder for destructor logic
 }
 
-void LLFloaterAIChat::onTabSelected(const LLSD& param)
+void FSFloaterAIChat::onTabSelected(const LLSD& param)
 {
     // Placeholder for onTabSelected logic
 }
 
-void LLFloaterAIChat::disableTabCtrls()
+void FSFloaterAIChat::disableTabCtrls()
 {
     // Placeholder for disableTabCtrls logic
 }
 
-void LLFloaterAIChat::refreshFromRegion(LLViewerRegion* region)
+void FSFloaterAIChat::refreshFromRegion(LLViewerRegion* region)
 {
     // Placeholder for refreshFromRegion logic
 }
 
-void LLFloaterAIChat::onGodLevelChange(U8 god_level)
+void FSFloaterAIChat::onGodLevelChange(U8 god_level)
 {
     // Placeholder for onGodLevelChange logic
 }
@@ -122,152 +139,250 @@ void LLFloaterAIChat::onGodLevelChange(U8 god_level)
 
 
 // -----------------------------------------------------------------------------
-// class LLPanelAIInfo - base class
+// class FSPanelAIInfo - base class
 
 // Constructor
-LLPanelAIInfo::LLPanelAIInfo()
+FSPanelAIInfo::FSPanelAIInfo()
 {
-    // Placeholder for constructor logic
-}
-
-// Button set handler
-void LLPanelAIInfo::onBtnSet()
-{
-    // Placeholder for onBtnSet logic
-}
-
-// Child control change handler
-void LLPanelAIInfo::onChangeChildCtrl(LLUICtrl* ctrl)
-{
-    // Placeholder for onChangeChildCtrl logic
-}
-
-// Change anything handler
-void LLPanelAIInfo::onChangeAnything()
-{
-    // Placeholder for onChangeAnything logic
-}
-
-// Static text change handler
-void LLPanelAIInfo::onChangeText(LLLineEditor* caller, void* user_data)
-{
-    // Placeholder for onChangeText logic
+    // placeholder
 }
 
 // Post build handler
-bool LLPanelAIInfo::postBuild()
+bool FSPanelAIInfo::postBuild()
 {
-    LL_INFOS("AIChat") << "in LLPanelAIInfo postBuild()" << LL_ENDL;
+    LL_INFOS("AIChat") << "in FSPanelAIInfo postBuild()" << LL_ENDL;
     return true;  // Assuming success for placeholder
 }
 
 // Update child control
-void LLPanelAIInfo::updateChild(LLUICtrl* child_ctrl)
+void FSPanelAIInfo::updateChild(LLUICtrl* child_ctrl)
 {
     // Placeholder for updateChild logic
 }
 
 // Enable button
-void LLPanelAIInfo::enableButton(const std::string& btn_name, bool enable)
+void FSPanelAIInfo::enableButton(const std::string& btn_name, bool enable)
 {
     // Placeholder for enableButton logic
 }
 
 // Disable button
-void LLPanelAIInfo::disableButton(const std::string& btn_name)
+void FSPanelAIInfo::disableButton(const std::string& btn_name)
 {
     // Placeholder for disableButton logic
 }
 
 // Initialize control
-void LLPanelAIInfo::initCtrl(const std::string& name)
+void FSPanelAIInfo::initCtrl(const std::string& name)
 {
     // Placeholder for initCtrl logic
 }
 
 // Template method for initializing and setting control
-template <typename CTRL> void LLPanelAIInfo::initAndSetCtrl(CTRL*& ctrl, const std::string& name)
+template <typename CTRL> void FSPanelAIInfo::initAndSetCtrl(CTRL*& ctrl, const std::string& name)
 {
     // Placeholder for initAndSetCtrl logic
 }
 
 
 // -----------------------------------------------------------------------------
-// class LLPanelAIConfiguration
+// class FSPanelAIConfiguration
 
-LLPanelAIConfiguration::LLPanelAIConfiguration()
+FSPanelAIConfiguration::FSPanelAIConfiguration() : mAIChatEnabled(nullptr),
+    mAIServiceCombo(nullptr),
+    mAIEndpoint(nullptr),
+    mAIAccountKey(nullptr),
+    mAICharacterKey(nullptr),
+    mAIConfigApplyBtn(nullptr)
 {
     // Constructor implementation here
     // Initialize any members or set up necessary configurations
 }
 
-void LLPanelAIConfiguration::initDispatch(LLDispatcher& dispatch)
-{
-    // Placeholder implementation for setting up dispatch routines
-    // This function should register the necessary callbacks or handlers in dispatch
-}
 
-void LLPanelAIConfiguration::updateControls(LLViewerRegion* region)
-{
-    // Placeholder implementation for updating controls based on the given region
-    // Code here should modify UI elements or settings based on region-specific data
-}
-
-bool LLPanelAIConfiguration::postBuild()
+bool FSPanelAIConfiguration::postBuild()
 {
     // Placeholder implementation for post-build actions
     // Code here should set up the panel UI after it's constructed
-    return true;
+
+    mAIServiceCombo = getChild<LLComboBox>("ai service");
+    if (mAIServiceCombo)
+    {
+        mAIServiceCombo->setCommitCallback(boost::bind(&FSPanelAIConfiguration::onSelectAIService, this));
+    }
+
+    mAIChatEnabled  = getChild<LLCheckBoxCtrl>("enable_ai_chat");
+    mAIEndpoint     = getChild<LLLineEditor>("ai_endpoint_value");
+    mAIAccountKey   = getChild<LLLineEditor>("ai_api_key_value");
+    mAICharacterKey = getChild<LLLineEditor>("ai_character_id_value");
+
+    mAIConfigApplyBtn = getChild<LLButton>("apply_btn");
+    if (mAIConfigApplyBtn)
+    {
+        mAIConfigApplyBtn->setCommitCallback(boost::bind(&FSPanelAIConfiguration::onApplyConfig, this));
+    }
+
+    // Read and set saved values
+    syncUIWithAISettings();
+
+    return FSPanelAIInfo::postBuild();
 }
 
-void LLPanelAIConfiguration::updateChild(LLUICtrl* child_ctrl)
+void FSPanelAIConfiguration::onSelectAIService()
 {
-    // Placeholder implementation for updating a specific child control
-    // This could involve setting properties or refreshing the child UI element
+    if (mAIServiceCombo)
+    {
+        std::string ai_service_name = mAIServiceCombo->getValue().asString();
+        LL_INFOS("AIChat") << "Selected AI service " << ai_service_name << LL_ENDL;
+
+        LLSD ai_config = LLSD::emptyMap();
+        ai_config["service"] = ai_service_name;
+        FSAIChatMgr::getInstance()->setAIConfig(ai_config);
+    }
 }
 
-void LLPanelAIConfiguration::refresh()
+void FSPanelAIConfiguration::syncUIWithAISettings()
 {
-    // Placeholder implementation for refreshing the entire panel
-    // Code here should ensure all elements are updated to reflect current data
+    const LLSD& ai_config = FSAIChatMgr::getInstance()->getAIConfig();
+
+    LL_INFOS("AIChat") << "current config is " << ai_config << LL_ENDL;
+
+    if (mAIChatEnabled)
+    {
+        mAIChatEnabled->setValue(ai_config.get("chat_enabled"));
+    }
+    if (mAIServiceCombo)
+    {
+        mAIServiceCombo->setValue(ai_config.get("service"));
+    }
+    if (mAIEndpoint)
+    {
+        mAIEndpoint->setValue(ai_config.get("endpoint"));
+    }
+    if (mAIAccountKey)
+    {
+        mAIAccountKey->setValue(ai_config.get("account_key"));
+    }
+    if (mAICharacterKey)
+    {
+        mAICharacterKey->setValue(ai_config.get("character_key"));
+    }
 }
+
+
+
+
+
+void FSPanelAIConfiguration::onApplyConfig()
+{
+    // Callback for pressing "Apply" button
+    LL_INFOS("AIChat") << "Config Apply button pressed" << LL_ENDL;
+
+    LLSD        ai_config      = LLSD::emptyMap();
+
+    if (mAIChatEnabled)
+    {
+        ai_config["chat_enabled"] = mAIChatEnabled->getValue().asBoolean();
+    }
+    if (mAIServiceCombo)
+    {
+        ai_config["service"] = mAIServiceCombo->getValue().asString();
+    }
+    if (mAIEndpoint)
+    {
+        std::string endpoint  = mAIEndpoint->getValue().asString();
+        ai_config["endpoint"] = endpoint;
+    }
+    if (mAIAccountKey)
+    {
+        ai_config["account_key"] = mAIAccountKey->getValue().asString();
+    }
+    if (mAICharacterKey)
+    {
+        ai_config["character_key"] = mAICharacterKey->getValue().asString();
+    }
+
+    FSAIChatMgr::getInstance()->setAIConfig(ai_config);
+}
+
 
 // -----------------------------------------------------------------------------
-// class LLPanelAIConversation
+// class FSPanelAIConversation
 
-LLPanelAIConversation::LLPanelAIConversation()
+FSPanelAIConversation::FSPanelAIConversation() : mChatWith(NULL),
+                                                 mLastAVChat(NULL),
+                                                 mAIService(NULL),
+                                                 mAIReply(NULL)
 {
     // Constructor implementation here
     // Initialize any members or set up necessary configurations
 }
 
-void LLPanelAIConversation::initDispatch(LLDispatcher& dispatch)
+void FSPanelAIConversation::initDispatch(LLDispatcher& dispatch)
 {
     // Placeholder implementation for setting up dispatch routines
     // This function should register the necessary callbacks or handlers in dispatch
 }
 
-void LLPanelAIConversation::updateControls(LLViewerRegion* region)
+void FSPanelAIConversation::updateControls(LLViewerRegion* region)
 {
     // Placeholder implementation for updating controls based on the given region
     // Code here should modify UI elements or settings based on region-specific data
 }
 
-bool LLPanelAIConversation::postBuild()
+bool FSPanelAIConversation::postBuild()
 {
     // Placeholder implementation for post-build actions
     // Code here should set up the panel UI after it's constructed
-    return true;
+    mChatWith = getChild<LLTextBox>("ai_chat_with");
+    mLastAVChat = getChild<LLTextBox>("last_av_message");
+    mAIService  = getChild<LLTextBox>("ai_chat_from");
+    mAIReply    = getChild<LLTextEditor>("ai_chat_editor");
+
+    return FSPanelAIInfo::postBuild();
 }
 
-void LLPanelAIConversation::updateChild(LLUICtrl* child_ctrl)
+void FSPanelAIConversation::updateChild(LLUICtrl* child_ctrl)
 {
     // Placeholder implementation for updating a specific child control
     // This could involve setting properties or refreshing the child UI element
 }
 
-void LLPanelAIConversation::refresh()
+void FSPanelAIConversation::refresh()
 {
     // Placeholder implementation for refreshing the entire panel
     // Code here should ensure all elements are updated to reflect current data
+}
+
+void FSPanelAIConversation::processIncomingChat(const std::string& name, const std::string& message)
+{   // Handle chat from other user
+    if (!mChatWith || !mLastAVChat)
+    {
+        LL_WARNS("AIChat") << "Unexpected null child item, can't process incoming chat" << LL_ENDL;
+        return;
+    }
+
+    std::string tmp_str;
+    LLStringUtil::format_map_t args;
+    args["[OTHER_AV]"] = name;
+    LLTrans::findString(tmp_str, "ai_chat_with", args);
+    mChatWith->setText(tmp_str);
+    mLastAVChat->setText(message);
+}
+
+// Handle chat response from AI
+void FSPanelAIConversation::processIncomingAIResponse(const std::string& service_name, const std::string& message)
+{
+    if (!mAIService || !mAIReply)
+    {
+        LL_WARNS("AIChat") << "Unexpected null child item, can't process AI chat reply" << LL_ENDL;
+        return;
+    }
+
+    std::string            tmp_str;
+    LLStringUtil::format_map_t args;
+    args["[AI_SERVICE_NAME]"] = service_name;
+    LLTrans::findString(tmp_str, "ai_chat_from", args);
+    mAIService->setText(tmp_str);
+    mAIReply->setText(message);
 }

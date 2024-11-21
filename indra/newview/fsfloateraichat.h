@@ -38,37 +38,44 @@
 
 #include "lleventcoro.h"
 
+class LLComboBox;
 class LLDispatcher;
 class LLLineEditor;
 class LLTabContainer;
 class LLViewerRegion;
 class LLViewerTextEditor;
 class LLCheckBoxCtrl;
+class LLLineEditor;
 class LLTextBox;
-class LLEventTimer;
+class LLTextEditor;
 
-class LLPanelAIConfiguration;
-class LLPanelAIConversation;
-class LLPanelAIInfo;
+class FSPanelAIConfiguration;
+class FSPanelAIConversation;
+class FSPanelAIInfo;
 
 
-class LLFloaterAIChat : public LLFloater
+// ------------------------------------------------------
+// Main floater class
+
+class FSFloaterAIChat : public LLFloater
 {
 public:
 
-    LLFloaterAIChat(const LLSD& seed);
-    ~LLFloaterAIChat();
+    FSFloaterAIChat(const LLSD& seed);
+    ~FSFloaterAIChat();
 
 
     void onOpen(const LLSD& key) override;
     void onClose(bool app_quitting) override;
     bool postBuild() override;
 
-    static LLPanelAIConfiguration * getPanelConfiguration();
-    static LLPanelAIConversation  * getPanelConversation();
+    FSPanelAIConfiguration * getPanelConfiguration();
+    FSPanelAIConversation  * getPanelConversation();
 
     // from LLPanel
     void refresh() override;
+
+    static FSFloaterAIChat* getAIChatFloater();
 
 protected:
     void onTabSelected(const LLSD& param);
@@ -78,25 +85,22 @@ protected:
 
     // member data
     LLTabContainer* mTab;
-    typedef std::vector<LLPanelAIInfo*> ai_info_panels_t;
+    typedef std::vector<FSPanelAIInfo*> ai_info_panels_t;
     ai_info_panels_t                    mAIInfoPanels;
 
 private:
 };
 
 
+// ------------------------------------------------------
 // Base class for all AI information panels.
-class LLPanelAIInfo : public LLPanel
+
+class FSPanelAIInfo : public LLPanel
 {
 public:
-    LLPanelAIInfo();
+    FSPanelAIInfo();
 
-    void onBtnSet();
-    void onChangeChildCtrl(LLUICtrl* ctrl);
-    void onChangeAnything();
-    static void onChangeText(LLLineEditor* caller, void* user_data);
-
-
+    // to do - clean up after more implementation, get rid of unused functions
     bool postBuild() override;
     virtual void updateChild(LLUICtrl* child_ctrl);
 
@@ -108,38 +112,42 @@ protected:
     template<typename CTRL> void initAndSetCtrl(CTRL*& ctrl, const std::string& name);
 };
 
-/////////////////////////////////////////////////////////////////////////////
-// Actual panels start here
-/////////////////////////////////////////////////////////////////////////////
 
+// ------------------------------------------------------
+// Actual panel classes start here
 
-class LLPanelAIConfiguration : public LLPanelAIInfo
+class FSPanelAIConfiguration : public FSPanelAIInfo
 {
 public:
-    static void initDispatch(LLDispatcher& dispatch);
-
-    LLPanelAIConfiguration();
-    ~LLPanelAIConfiguration() {}
-
-    void updateControls(LLViewerRegion* region);
+    FSPanelAIConfiguration();
+    ~FSPanelAIConfiguration() {}
 
     bool postBuild() override;
-    void updateChild(LLUICtrl* child_ctrl) override;
-    void refresh() override;
+    void onSelectAIService();
+    void onApplyConfig();
 
-protected:
+  protected:
+    void            syncUIWithAISettings();
+
+    LLCheckBoxCtrl* mAIChatEnabled;   // Use AI chat
+    LLComboBox*     mAIServiceCombo;    // Selected service to use
+
+    LLLineEditor*   mAIEndpoint;        // URL
+    LLLineEditor*   mAIAccountKey;      // Account key
+    LLLineEditor*   mAICharacterKey;    // URL
+    LLButton*       mAIConfigApplyBtn;  // Apply button
 };
 
 
 /////////////////////////////////////////////////////////////////////////////
 
-class LLPanelAIConversation : public LLPanelAIInfo
+class FSPanelAIConversation : public FSPanelAIInfo
 {
   public:
     static void initDispatch(LLDispatcher& dispatch);
 
-    LLPanelAIConversation();
-    ~LLPanelAIConversation() {}
+    FSPanelAIConversation();
+    ~FSPanelAIConversation() {}
 
     void updateControls(LLViewerRegion* region);
 
@@ -147,7 +155,17 @@ class LLPanelAIConversation : public LLPanelAIInfo
     void updateChild(LLUICtrl* child_ctrl) override;
     void refresh() override;
 
+    // Chat coming from another avatar
+    void processIncomingChat(const std::string& name, const std::string& message);
+
+    // Reply from AI
+    void processIncomingAIResponse(const std::string& service_name, const std::string& message);
+
   protected:
+    LLTextBox *     mChatWith;          // Other avatar in the chat
+    LLTextBox *     mLastAVChat;        // Last chat from other avatar
+    LLTextBox *     mAIService;         // AI service
+    LLTextEditor *  mAIReply;           // Last reply from AI
 };
 
 

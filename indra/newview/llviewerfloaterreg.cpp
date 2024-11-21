@@ -618,7 +618,7 @@ void LLViewerFloaterReg::registerFloaters()
 
     // *NOTE: Please keep these alphabetized for easier merges
     // ND: And for FS please put yours after this line, for easier merges too
-    LLFloaterReg::add("ai_chat", "floater_ai_chat.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterAIChat>);
+    LLFloaterReg::add("ai_chat", "floater_ai_chat.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<FSFloaterAIChat>);
 
     LLFloaterReg::add("animation_explorer", "floater_animation_explorer.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<AnimationExplorer>);
     LLFloaterReg::add("animation_overrider", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);

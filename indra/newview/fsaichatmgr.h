@@ -28,19 +28,22 @@
 * This is experimental code to integrate external chat systems to the SL / FS 
 * chat experience.
 * 
-* This module contains the main chat processing, while llfloateraichat.h/.cpp 
+* This module contains the main chat processing, while fsfloateraichat.h/.cpp
 * create the tabbed window that handles the UI for configuration and interacting
 * with the chat process.
 */
 
-#ifndef FS_FSFLOATERAICHAT_H
-#define FS_FSFLOATERAICHAT_H
+#ifndef FS_FSAICHATMGR_H
+#define FS_FSAICHATMGR_H
 
 
 #include "stdtypes.h"
 
 #include "lluuid.h"
 #include "llsingleton.h"
+
+
+class FSAIService;
 
 
 class FSAIChatMgr : public LLSingleton<FSAIChatMgr>
@@ -50,20 +53,31 @@ class FSAIChatMgr : public LLSingleton<FSAIChatMgr>
 
 public:
     void            setTargetSession(const LLUUID& chat_session);
-    const LLUUID&   getTargetSession() { return mTargetSession; };
+    const LLUUID&   getTargetSession() const { return mTargetSession; };
     void            clearMatchingTargetSession(const LLUUID& closing_session);
 
+    void            setAIConfig(LLSD & ai_config);    // Supports some subset of config value changes
+    const LLSD&     getAIConfig() const         { return mAIConfig;  }
+
+    void            loadAvatarAISettings();
+    void            saveAvatarAISettings();
+
     // Setting mTargetAgent happens when new session is set up
-    const LLUUID&   getTargetAgent() { return mTargetAgent; };
+    const LLUUID&   getTargetAgent() const { return mTargetAgent; };
 
 
     void            processIncomingChat(const LLUUID& from_id,
                                         const std::string& message,
                                         const std::string& name,
                                         const LLUUID& sessionid);
+    void            processIncomingAIResponse(const std::string& ai_message);
 
-private:
-    LLUUID mTargetSession;
-    LLUUID mTargetAgent;
+  private:
+    LLSD            readFullAvatarAISettings();  // Reads the full file possibly with multiple configurations
+
+    LLUUID       mTargetSession;
+    LLUUID       mTargetAgent;
+    FSAIService* mAIService;
+    LLSD         mAIConfig;         // Configuration values for AI back end
 };
 #endif

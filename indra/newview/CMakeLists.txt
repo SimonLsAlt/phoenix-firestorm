@@ -98,6 +98,7 @@ set(viewer_SOURCE_FILES
     exogroupmutelist.cpp
     floatermedialists.cpp
     fsaichatmgr.cpp
+    fsaiservice.cpp
     fsareasearch.cpp
     fsareasearchmenu.cpp
     fsassetblacklist.cpp
@@ -909,6 +910,7 @@ set(viewer_HEADER_FILES
     exogroupmutelist.h
     floatermedialists.h
     fsaichatmgr.h
+    fsaiservice.h
     fsareasearch.h
     fsareasearchmenu.h
     fsassetblacklist.h
