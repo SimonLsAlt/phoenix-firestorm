@@ -26,6 +26,7 @@
 
 #include "llviewerprecompiledheaders.h"
 #include "fsaiservice.h"
+#include "fsaichatstrings.h"
 #include "fsaichatmgr.h"
 
 #include "llcoros.h"
@@ -58,15 +59,24 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
 {
 	// Based on the name, create the proper service class handler
     FSAIService* ai_service = nullptr;
-    if (service_name == "LMStudio")
+    if (service_name == LLM_KINDROID)
+    {
+        ai_service = dynamic_cast<FSAIService*>(new FSAIKindroidService(service_name));
+    }
+    else if (service_name == LLM_LMSTUDIO)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAILMStudioService(service_name));
     }
-    else if (service_name == "Nomi.ai")
+    else if (service_name == LLM_OPENAI)
+    {
+        ai_service = dynamic_cast<FSAIService*>(new FSAIOpenAIService(service_name));
+    }
+    else if (service_name == LLM_NOMI)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAINomiService(service_name));
     }
-    
+
+
     // else ... add other supported back-ends here
 
     return ai_service;
@@ -75,10 +85,10 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
 // ------------------------------------------------
 // Use nomi.ai
 
-// curl - X POST - H "Authorization: Bearer ea837b15-c9c1-4990-8fed-216ba1c692eb" \
+// curl - X POST - H "Authorization: Bearer ea123456-c9c1-4990-8fed-216ba1c692eb" \
 //               - H "Content-Type: application/json" \
 //               -d '{"messageText": "Hello there"}' \
-//            https:  // api.nomi.ai/v1/nomis/bb400109-9943-4524-98ca-82f15c044146/chat
+//            https://api.nomi.ai/v1/nomis/bb400109-9943-4524-98ca-82f15c044146/chat
 //
 // response content:
 // {
@@ -103,18 +113,23 @@ bool FSAINomiService::validateConfig(const LLSD& config)
     return true;
 };
 
-bool FSAINomiService::sendChat(const std::string& message)
+bool FSAINomiService::sendChatToAIService(const std::string& message, bool request_direct)
 {  // Send message to the AI service
     bool        sent = false;
-    std::string url  = getAIConfig().get("endpoint");
+    std::string url  = getAIConfig().get(AI_ENDPOINT);
     if (url.empty())
 	{
         LL_WARNS("AIChat") << "Failed to get URL to back-end AI chat service, check the AI configuration panel" << LL_ENDL;
         LL_WARNS("AIChat") << "getAIConfig() is " << getAIConfig() << LL_ENDL;
     }
+	else if (getRequestBusy())
+	{
+        LL_WARNS("AIChat") << "AI request is busy - need to handle this better with a queue?" << LL_ENDL;
+	}
     else
     {
         LL_INFOS("AIChat") << "Sending chat request to " << url << LL_ENDL;
+        mRequestDirect = request_direct;    // xxx
         setRequestBusy();
         LLCoros::instance().launch("FSAINomiService::getAIResponseCoro",
                                    boost::bind(&FSAINomiService::getAIResponseCoro, this, url, message));
@@ -126,14 +141,12 @@ bool FSAINomiService::sendChat(const std::string& message)
 
 bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::string& message)
 {
-    // To do - add flag showing a request is in flight
-
     LLCore::HttpRequest::policy_t               httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
     LLCore::HttpRequest::ptr_t                  httpRequest(new LLCore::HttpRequest);
 
     LLCore::HttpHeaders::ptr_t headers = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
-    headers->append(HTTP_OUT_HEADER_AUTHORIZATION, getAIConfig().get("account_key"));
+    headers->append(HTTP_OUT_HEADER_AUTHORIZATION, getAIConfig().get(AI_API_KEY));
     headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_JSON);
 
 	LLSD body = LLSD::emptyMap();
@@ -151,7 +164,7 @@ bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::strin
         LL_INFOS("AIChat") << "Do something with:  " << req_response.get("replyMessage") << LL_ENDL;
         const std::string& ai_message = req_response.get("replyMessage").get("text");
 
-		FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message);
+		FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
         //'replyMessage' : {
         //    'sent': '2024-11-21T01:15:38.726Z',
         //    'text': 'Okay, enjoy your dinner and let me know when you\'re ready to resume testing!',
@@ -194,8 +207,9 @@ bool FSAILMStudioService::validateConfig(const LLSD& config)
     return true;
 };
 
-bool FSAILMStudioService::sendChat(const std::string& message)
+bool FSAILMStudioService::sendChatToAIService(const std::string& message, bool request_direct)
 {   // Send message to the AI service
+    mRequestDirect   = request_direct;
     bool        sent = false;
     std::string url;    // to do - get value and fill out request data
     if (!url.empty())
@@ -241,4 +255,83 @@ bool FSAILMStudioService::getAIResponseCoro(const std::string& url, const std::s
     }*/
 
 	return true;
+}
+
+
+
+// ------------------------------------------------
+// Use local LLM via OpenAI
+FSAIOpenAIService::FSAIOpenAIService(const std::string& name) : FSAIService(name)
+{  // Call base class constructor
+    LL_INFOS("AIChat") <<"FSAIOpenAIService created with name: " << name<< LL_ENDL;
+}
+
+// Destructor
+FSAIOpenAIService::~FSAIOpenAIService()
+{
+	LL_INFOS("AIChat") <<"FSAIOpenAIService destroyed"<< LL_ENDL;
+}
+
+// sendChat override
+bool FSAIOpenAIService::sendChatToAIService(const std::string& message, bool request_direct)
+{
+    mRequestDirect = request_direct;
+    LL_INFOS("AIChat") <<"sendChat called with message: " << message << LL_ENDL;
+    // Placeholder logic
+    return true;
+}
+
+// validateConfig override
+bool FSAIOpenAIService::validateConfig(const LLSD& config)
+{
+    LL_INFOS("AIChat") <<"validateConfig called" << LL_ENDL;
+    // Placeholder logic: Assume config is always valid
+    return true;
+}
+
+// getAIResponseCoro
+bool FSAIOpenAIService::getAIResponseCoro(const std::string& url, const std::string& message)
+{
+    LL_INFOS("AIChat") <<"getAIResponseCoro called with URL: " << url << " and message: " << message<< LL_ENDL;
+    // Placeholder logic
+    return true;
+}
+
+
+// ------------------------------------------------
+// Use local LLM via Kindroid
+FSAIKindroidService::FSAIKindroidService(const std::string& name) : FSAIService(name)
+{  // Call base class constructor
+    LL_INFOS("AIChat") << "FSAIKindroidService created with name: " << name << LL_ENDL;
+}
+
+// Destructor
+FSAIKindroidService::~FSAIKindroidService()
+{
+	LL_INFOS("AIChat") << "FSAIKindroidService destroyed" << LL_ENDL;
+}
+
+// sendChat override
+bool FSAIKindroidService::sendChatToAIService(const std::string& message, bool request_direct)
+{
+    mRequestDirect = request_direct;
+    LL_INFOS("AIChat") << "sendChat called with message: " << message << LL_ENDL;
+    // Placeholder logic
+    return true;
+}
+
+// validateConfig override
+bool FSAIKindroidService::validateConfig(const LLSD& config)
+{
+    LL_INFOS("AIChat") << "validateConfig called" << LL_ENDL;
+    // Placeholder logic: Assume config is always valid
+    return true;
+}
+
+// getAIResponseCoro
+bool FSAIKindroidService::getAIResponseCoro(const std::string& url, const std::string& message)
+{
+    LL_INFOS("AIChat") << "getAIResponseCoro called with URL: " << url << " and message: " << message << LL_ENDL;
+    // Placeholder logic
+    return true;
 }

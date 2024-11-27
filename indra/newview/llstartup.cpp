@@ -47,6 +47,9 @@
 #include "llaudioengine_openal.h"
 #endif
 
+// <FS:simonlsalt> [FS AI chat system]
+#include "fsaichatmgr.h"
+// <FS:simonlsalt> [FS AI chat system]
 #include "llavatarnamecache.h"
 #include "llexperiencecache.h"
 #include "lllandmark.h"
@@ -2430,6 +2433,10 @@ bool idle_startup()
             LLHUDManager::getInstance()->sendEffects();
         }
 
+        // <FS:simonlsalt> [FS AI chat system]  
+        FSAIChatMgr::getInstance()->startupAIChat();
+        // <FS:simonlsalt> [FS AI chat system]
+        
         LLStartUp::setStartupState( STATE_AGENT_WAIT );     // Go to STATE_AGENT_WAIT
 
         timeout.reset();

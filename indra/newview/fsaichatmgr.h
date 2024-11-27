@@ -45,6 +45,11 @@
 
 class FSAIService;
 
+// Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
+typedef std::deque<std::string> ai_chat_history_t;
+static const S32 AI_HISTORY_MAX = 20;  // up to 10 message / reply pairs
+
+
 
 class FSAIChatMgr : public LLSingleton<FSAIChatMgr>
 {
@@ -52,8 +57,10 @@ class FSAIChatMgr : public LLSingleton<FSAIChatMgr>
     ~FSAIChatMgr();
 
 public:
-    void            setTargetSession(const LLUUID& chat_session);
-    const LLUUID&   getTargetSession() const { return mTargetSession; };
+    void            startupAIChat();    // Called at viewer startup time
+
+    void            setChatSession(const LLUUID& chat_session);
+    const LLUUID&   getChatSession() const { return mChatSession; };
     void            clearMatchingTargetSession(const LLUUID& closing_session);
 
     void            setAIConfig(LLSD & ai_config);    // Supports some subset of config value changes
@@ -62,22 +69,30 @@ public:
     void            loadAvatarAISettings();
     void            saveAvatarAISettings();
 
-    // Setting mTargetAgent happens when new session is set up
-    const LLUUID&   getTargetAgent() const { return mTargetAgent; };
+    // Setting mChattyAgent happens when new session is set up
+    const LLUUID&   getChattyAgent() const { return mChattyAgent; };
 
 
     void            processIncomingChat(const LLUUID& from_id,
                                         const std::string& message,
                                         const std::string& name,
                                         const LLUUID& sessionid);
-    void            processIncomingAIResponse(const std::string& ai_message);
+    void            processIncomingAIResponse(const std::string& ai_message, bool request_direct);
+    void            setAIReplyMessagePrompt();
+
+    bool            sendChatToAIService(const std::string& message, bool request_direct);
+
+    const ai_chat_history_t& getAIChatHistory() const { return mAIChatHistory; };
 
   private:
     LLSD            readFullAvatarAISettings();  // Reads the full file possibly with multiple configurations
+    void            createAIService(const std::string& ai_service_name);  // Creates service object mAIService
+    void            trimAIChatHistoryData();      // Limit history storage
 
-    LLUUID       mTargetSession;
-    LLUUID       mTargetAgent;
-    FSAIService* mAIService;
+    LLUUID       mChatSession;      // Chat session id
+    LLUUID       mChattyAgent;      // Other agent
+    FSAIService* mAIService;        // Interface to external AI chat service
     LLSD         mAIConfig;         // Configuration values for AI back end
+    ai_chat_history_t mAIChatHistory;    // Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
 };
 #endif

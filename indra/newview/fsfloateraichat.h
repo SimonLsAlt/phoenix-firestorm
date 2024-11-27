@@ -51,6 +51,7 @@ class LLTextEditor;
 
 class FSPanelAIConfiguration;
 class FSPanelAIConversation;
+class FSPanelAIDirect2LLM;
 class FSPanelAIInfo;
 
 
@@ -71,20 +72,13 @@ public:
 
     FSPanelAIConfiguration * getPanelConfiguration();
     FSPanelAIConversation  * getPanelConversation();
-
-    // from LLPanel
-    void refresh() override;
+    FSPanelAIDirect2LLM    * getPanelDirect2LLM();
 
     static FSFloaterAIChat* getAIChatFloater();
 
 protected:
-    void onTabSelected(const LLSD& param);
-    void disableTabCtrls();
-    void refreshFromRegion(LLViewerRegion* region);
-    void onGodLevelChange(U8 god_level);
-
     // member data
-    LLTabContainer* mTab;
+
     typedef std::vector<FSPanelAIInfo*> ai_info_panels_t;
     ai_info_panels_t                    mAIInfoPanels;
 
@@ -102,14 +96,12 @@ public:
 
     // to do - clean up after more implementation, get rid of unused functions
     bool postBuild() override;
-    virtual void updateChild(LLUICtrl* child_ctrl);
 
-    void enableButton(const std::string& btn_name, bool enable = true);
-    void disableButton(const std::string& btn_name);
+    virtual bool enableUIElement(const std::string& ui_name, const std::string& service_name) const { return true; };
 
-protected:
-    void initCtrl(const std::string& name);
-    template<typename CTRL> void initAndSetCtrl(CTRL*& ctrl, const std::string& name);
+  protected:
+    void updateUIElement(const std::string& lineEditorName, const std::string& textBoxName,
+                         const LLSD& ai_config, const std::string& ai_service);
 };
 
 
@@ -126,16 +118,11 @@ public:
     void onSelectAIService();
     void onApplyConfig();
 
+    bool enableUIElement(const std::string& ui_name, const std::string& service_name) const override;
+
   protected:
-    void            syncUIWithAISettings();
+    void syncUIWithAISettings();
 
-    LLCheckBoxCtrl* mAIChatEnabled;   // Use AI chat
-    LLComboBox*     mAIServiceCombo;    // Selected service to use
-
-    LLLineEditor*   mAIEndpoint;        // URL
-    LLLineEditor*   mAIAccountKey;      // Account key
-    LLLineEditor*   mAICharacterKey;    // URL
-    LLButton*       mAIConfigApplyBtn;  // Apply button
 };
 
 
@@ -144,28 +131,40 @@ public:
 class FSPanelAIConversation : public FSPanelAIInfo
 {
   public:
-    static void initDispatch(LLDispatcher& dispatch);
-
     FSPanelAIConversation();
     ~FSPanelAIConversation() {}
 
-    void updateControls(LLViewerRegion* region);
-
     bool postBuild() override;
-    void updateChild(LLUICtrl* child_ctrl) override;
-    void refresh() override;
 
     // Chat coming from another avatar
     void processIncomingChat(const std::string& name, const std::string& message);
 
     // Reply from AI
-    void processIncomingAIResponse(const std::string& service_name, const std::string& message);
+    void displayIncomingAIResponse(const std::string& message);
 
-  protected:
-    LLTextBox *     mChatWith;          // Other avatar in the chat
-    LLTextBox *     mLastAVChat;        // Last chat from other avatar
-    LLTextBox *     mAIService;         // AI service
-    LLTextEditor *  mAIReply;           // Last reply from AI
+    void setAIReplyMessagePrompt(const std::string& service_name);
+
+protected:
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+
+class FSPanelAIDirect2LLM : public FSPanelAIInfo
+{
+  public:
+    FSPanelAIDirect2LLM();
+    ~FSPanelAIDirect2LLM() {}
+
+    bool postBuild() override;
+    void onSendMsgToLLM();
+
+    // Reply from AI
+    void displayIncomingAIResponse(const std::string& message);
+
+    void setAIServiceNamePrompts(const std::string& service_name);
+
+protected:
 };
 
 

@@ -31,7 +31,7 @@
      label="Enable AI-based chat service:  "
      layout="topleft"
      left="20"
-     name="enable_ai_chat"
+     name="chat_on"
      tool_tip="Checking this box will use an AI service for IM chat"
      top_delta="32"
      width="182" />
@@ -42,7 +42,7 @@
      follows="left|top"
      top_pad="-21"
      left_pad="2"
-     name="ai service"
+     name="service"
      visible="true"
      width="120">
         <combo_box.item
@@ -81,7 +81,7 @@
      height="23"
      layout="topleft"
      left="20"
-     name="ai_endpoint"
+     name="endpoint_prompt"
      width="120">
         API Endpoint:
     </text>
@@ -94,7 +94,7 @@
      height="23"
      layout="topleft"
      max_length_bytes="1024"
-     name="ai_endpoint_value"
+     name="endpoint"
      width="320" />
 
     <text
@@ -106,7 +106,7 @@
      height="23"
      layout="topleft"
      left="20"
-     name="ai_api_key"
+     name="api_key_prompt"
      width="120">
         API Key:
     </text>
@@ -119,7 +119,7 @@
      height="23"
      layout="topleft"
      max_length_bytes="256"
-     name="ai_api_key_value"
+     name="api_key"
      width="320" />
 
     <text
@@ -131,7 +131,7 @@
      height="23"
      layout="topleft"
      left="20"
-     name="ai_character_id"
+     name="character_id_prompt"
      width="120">
         Character ID:
     </text>
@@ -144,7 +144,7 @@
      height="23"
      layout="topleft"
      max_length_bytes="256"
-     name="ai_character_id_value"
+     name="character_id"
      width="320" />
 
     <button
@@ -156,6 +156,6 @@
      height="24"
      label="Apply"
      name="apply_btn"
-     width="97">
+     width="108">
     </button>
-</panel>
+  </panel>
