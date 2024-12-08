@@ -44,7 +44,11 @@ public:
 
     const std::string& getName() { return mName; };
 
-    virtual bool sendChatToAIService(const std::string& message, bool request_direct) = 0;
+    virtual void sendChatToAIService(const std::string& message, bool request_direct) = 0;
+    virtual void sendChatTargetChangeMessage(const std::string& previous_name, const std::string& new_name) {};
+
+    // Check if message should be dropped
+    virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) { return false; };
 
     // Flag indicating a request is processing
     void setRequestBusy(bool busy = true) { mRequestBusy = busy; };
@@ -58,6 +62,10 @@ protected:
     bool        mRequestBusy;  // Flag that a request is running the coroutine
     bool        mRequestDirect;  // Flag that a request is direct to LLM, not from avatar chat (to do - make a type?)
     std::string mName;         // Name of this AI service
+
+    // super-simple 1 message queue so we can send a directive before a user chat message
+    std::string mNextMessage;
+    bool        mNextMessageDirect;
 };
 
 
@@ -69,7 +77,9 @@ class FSAINomiService : public FSAIService
     FSAINomiService(const std::string& name);
     ~FSAINomiService();
 
-    virtual bool sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void sendChatTargetChangeMessage(const std::string& previous_name, const std::string& new_name) override;
+    virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) override;
 
   protected:
     virtual bool validateConfig(const LLSD& config) override;
@@ -85,7 +95,7 @@ class FSAILMStudioService : public FSAIService
     FSAILMStudioService(const std::string& name);
     ~FSAILMStudioService();
 
-    virtual bool sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
 
   protected:
     virtual bool validateConfig(const LLSD& config) override;
@@ -102,7 +112,7 @@ class FSAIOpenAIService : public FSAIService
     FSAIOpenAIService(const std::string& name);
     ~FSAIOpenAIService();
 
-    virtual bool sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
 
   protected:
     virtual bool validateConfig(const LLSD& config) override;
@@ -119,7 +129,7 @@ class FSAIKindroidService : public FSAIService
     FSAIKindroidService(const std::string& name);
     ~FSAIKindroidService();
 
-    virtual bool sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
 
   protected:
     virtual bool validateConfig(const LLSD& config) override;

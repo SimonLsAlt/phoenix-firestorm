@@ -113,9 +113,8 @@ bool FSAINomiService::validateConfig(const LLSD& config)
     return true;
 };
 
-bool FSAINomiService::sendChatToAIService(const std::string& message, bool request_direct)
+void FSAINomiService::sendChatToAIService(const std::string& message, bool request_direct)
 {  // Send message to the AI service
-    bool        sent = false;
     std::string url  = getAIConfig().get(AI_ENDPOINT);
     if (url.empty())
 	{
@@ -123,20 +122,52 @@ bool FSAINomiService::sendChatToAIService(const std::string& message, bool reque
         LL_WARNS("AIChat") << "getAIConfig() is " << getAIConfig() << LL_ENDL;
     }
 	else if (getRequestBusy())
-	{
-        LL_WARNS("AIChat") << "AI request is busy - need to handle this better with a queue?" << LL_ENDL;
+	{   // Already have a chat request in-flight to AI LLM.   Save it to resend
+        if (mNextMessage.size() == 0)
+        {
+            mNextMessage = message;
+            mNextMessageDirect = request_direct;
+            LL_INFOS("AIChat") << "Saving outgoing message since another is in-flight: " << message << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS("AIChat") << "AI request is busy - dropping message.   Already have one waiting.  Dropping message: " << message << LL_ENDL;
+        }
 	}
+    else if (messageToAIShouldBeDropped(message, request_direct))
+    {   // messageToAIShouldBeDropped() will log about anything interesting
+        return;
+    }
     else
-    {
-        LL_INFOS("AIChat") << "Sending chat request to " << url << LL_ENDL;
-        mRequestDirect = request_direct;    // xxx
+    {   // Send message via coroutine
+        mRequestDirect = request_direct;
+        LL_INFOS("AIChat") << "Sending " << (mRequestDirect ? "direct" : "regular") << " AI chat request to " << url << ": " << message << LL_ENDL;
         setRequestBusy();
         LLCoros::instance().launch("FSAINomiService::getAIResponseCoro",
                                    boost::bind(&FSAINomiService::getAIResponseCoro, this, url, message));
-        sent = true;
     }
+}
 
-    return sent;
+
+bool FSAINomiService::messageToAIShouldBeDropped(const std::string& message, bool request_direct)
+{
+    if (!request_direct)
+    {  // If someday more incoming message filtering is needed, this is a good bottleneck
+        // Reject messages with "OOC:" from user - tbd:  handle differently?
+        std::string msg_lower = utf8str_tolower(message);
+        if (msg_lower.find("ooc:") != std::string::npos)
+        {  // Possibly move some of this to base class to reuse in other implementations
+            LL_WARNS("AIChat") << "Dropping regular message with OOC:  " << message << LL_ENDL;
+            return true;
+        }
+        if (msg_lower.find("you are chatting with a bot") == 0)
+        {   // @simonlsalt:  Ugly match, but a bot warning comes in from SL servers spoofing as if from the bot account
+            // This gets in the way if two bots talk to each other, which is an amusing experiment.  I can't complain too much, I wrote it :(
+            LL_WARNS("AIChat") << "Dropping bot warning message:  " << message << LL_ENDL;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::string& message)
@@ -161,13 +192,29 @@ bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::strin
 
 	if (status.getStatus() == 0)
 	{
-        LL_INFOS("AIChat") << "Do something with:  " << req_response.get("replyMessage") << LL_ENDL;
-        const std::string& ai_message = req_response.get("replyMessage").get("text");
+        LL_INFOS("AIChat") << "AI response:  " << req_response.get("replyMessage") << LL_ENDL;
+        std::string ai_message = req_response.get("replyMessage").get("text");
 
-		FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
+        if (boost::starts_with(ai_message, "(OOC:"))
+        {   // Ensure OOC: removed from reply going to other person
+            std::size_t close_paren = ai_message.find(")");
+            if (close_paren != std::string::npos)
+            {
+                std::string ooc_part = ai_message.substr(0, close_paren + 1);
+                ai_message.erase(0, close_paren + 1);
+                LL_INFOS("AIChat") << "Removing OOC part of chat reply:  " << ooc_part << ", leaving message " << ai_message << LL_ENDL;
+                FSAIChatMgr::getInstance()->processIncomingAIResponse(ooc_part, mRequestDirect);  // Handle OOC part
+                mRequestDirect = false;     // Pass rest of it to conversation
+            }
+        }
+
+        if (ai_message.length())
+        {
+            FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
+        }
         //'replyMessage' : {
         //    'sent': '2024-11-21T01:15:38.726Z',
-        //    'text': 'Okay, enjoy your dinner and let me know when you\'re ready to resume testing!',
+        //    'text': 'Okay, enjoy your dinner and let me know when you\'re ready to resume chatting!',
         //    'uuid': '673e89ba-7ec7-d197-7ce9-777000000000'
         //},
 	}
@@ -179,10 +226,40 @@ bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::strin
     }
 
     setRequestBusy(false);
+
+    if (mNextMessage.size() > 0)
+    {   // Have another message ready to go
+        LL_INFOS("AIChat") << "Sending saved chat request to " << url << LL_ENDL;
+        std::string next_message = mNextMessage;
+        mNextMessage.clear();
+        mRequestDirect = mNextMessageDirect;
+        setRequestBusy();
+        LLCoros::instance().launch("FSAINomiService::getAIResponseCoro",
+                                   boost::bind(&FSAINomiService::getAIResponseCoro, this, url, message));
+    }
+
     return true;
 }
 
 
+void FSAINomiService::sendChatTargetChangeMessage(const std::string& previous_name, const std::string& new_name)
+{  // Caller should ensure there is a name change and new_name is not empty
+    static std::string chat_ai_previous("  Do not mention [PREVIOUS_NAME].");        // tbd - translate?
+    static std::string chat_ai_new("(OOC: You are now talking with [NEW_NAME].  Do not mention any other people you have been talking with.");
+
+    LLStringUtil::format_map_t sub_map;
+    sub_map["PREVIOUS_NAME"] = previous_name;
+    sub_map["NEW_NAME"]      = new_name;
+
+    std::string new_chat_msg(chat_ai_new);
+    if (previous_name.size())
+    {  // Replace the tag in the first string
+        new_chat_msg.append(chat_ai_previous);
+    }
+    new_chat_msg.append(")");       // close "(OOC: ..." parenthesis
+    LLStringUtil::format(new_chat_msg, sub_map);
+    FSAIChatMgr::getInstance()->sendChatToAIService(new_chat_msg, true);  // Send that as a direct message to the LLM
+}
 
 
 
@@ -207,19 +284,15 @@ bool FSAILMStudioService::validateConfig(const LLSD& config)
     return true;
 };
 
-bool FSAILMStudioService::sendChatToAIService(const std::string& message, bool request_direct)
+void FSAILMStudioService::sendChatToAIService(const std::string& message, bool request_direct)
 {   // Send message to the AI service
     mRequestDirect   = request_direct;
-    bool        sent = false;
     std::string url;    // to do - get value and fill out request data
     if (!url.empty())
     {
         LLCoros::instance().launch("FSAILMStudioService::getAIResponseCoro",
                                    boost::bind(&FSAILMStudioService::getAIResponseCoro, this, url, message));
-        sent = true;
     }
-
-    return sent;
 }
 
 bool FSAILMStudioService::getAIResponseCoro(const std::string& url, const std::string& message)
@@ -273,12 +346,10 @@ FSAIOpenAIService::~FSAIOpenAIService()
 }
 
 // sendChat override
-bool FSAIOpenAIService::sendChatToAIService(const std::string& message, bool request_direct)
+void FSAIOpenAIService::sendChatToAIService(const std::string& message, bool request_direct)
 {
     mRequestDirect = request_direct;
     LL_INFOS("AIChat") <<"sendChat called with message: " << message << LL_ENDL;
-    // Placeholder logic
-    return true;
 }
 
 // validateConfig override
@@ -312,12 +383,11 @@ FSAIKindroidService::~FSAIKindroidService()
 }
 
 // sendChat override
-bool FSAIKindroidService::sendChatToAIService(const std::string& message, bool request_direct)
+void FSAIKindroidService::sendChatToAIService(const std::string& message, bool request_direct)
 {
     mRequestDirect = request_direct;
     LL_INFOS("AIChat") << "sendChat called with message: " << message << LL_ENDL;
     // Placeholder logic
-    return true;
 }
 
 // validateConfig override

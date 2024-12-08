@@ -98,6 +98,7 @@ public:
     bool postBuild() override;
 
     virtual bool enableUIElement(const std::string& ui_name, const std::string& service_name) const { return true; };
+    virtual void resetChat() {};
 
   protected:
     void updateUIElement(const std::string& lineEditorName, const std::string& textBoxName,
@@ -135,6 +136,10 @@ class FSPanelAIConversation : public FSPanelAIInfo
     ~FSPanelAIConversation() {}
 
     bool postBuild() override;
+    void resetChat() override;
+
+    void onSendMsgToAgent();  // Send proof-read / edited chat message to avatar
+    void onResetChat();     // reset chat button pressed
 
     // Chat coming from another avatar
     void processIncomingChat(const std::string& name, const std::string& message);
@@ -157,6 +162,8 @@ class FSPanelAIDirect2LLM : public FSPanelAIInfo
     ~FSPanelAIDirect2LLM() {}
 
     bool postBuild() override;
+    void resetChat() override;
+
     void onSendMsgToLLM();
 
     // Reply from AI

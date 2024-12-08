@@ -36,6 +36,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llsdserialize.h"
+#include "llavatarnamecache.h"
 #include "llimview.h"
 
 #include "fsaichatmgr.h"
@@ -48,7 +49,7 @@
 // Name of config file saved in each av folder
 inline constexpr char AVATAR_AI_SETTINGS_FILENAME[] = "avatar_ai_settings.xml ";
 
-
+static constexpr F32 AI_CHAT_AFK_GIVEUP_SECS = (60 * 15);       // 15 minutes
 
 // ----------------------------------------------------------------------------------------
 
@@ -61,6 +62,8 @@ FSAIChatMgr::FSAIChatMgr() : mAIService(nullptr)
     mAIConfig[AI_ENDPOINT]      = std::string();
     mAIConfig[AI_API_KEY]   = std::string();
     mAIConfig[AI_CHARACTER_ID] = std::string();
+
+    mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);
 };
 
 
@@ -135,7 +138,7 @@ void FSAIChatMgr::loadAvatarAISettings()
                 for (LLSD::map_const_iterator config_it = config_data.beginMap(); config_it != config_data.endMap(); ++config_it)
                 {
                     mAIConfig[config_it->first] = config_it->second;
-                    LL_INFOS("AIChat") << " setting '" << config_it->first << "' is " << mAIConfig[config_it->first].asStringRef() << LL_ENDL;
+                    LL_INFOS("AIChat") << " setting '" << config_it->first << "' is " << config_it->second << LL_ENDL;
                 }
                 break;
             }
@@ -238,20 +241,43 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
     LL_INFOS("AIChat") << "Handling IM chat from " << from_id << " name " << name << ", session " << sessionid << ", text: " << message
                        << LL_ENDL;
 
-    if (mChatSession.isNull())
-    {  // Start new chat
-        // to do - check if AI chat is enabled, this ID is on allow list, etc
-        mChatSession = sessionid;  // Save info
-        mChattyAgent   = from_id;
-    }
-
     if (mAIConfig.get(AI_CHAT_ON).asBoolean())
-    {   // Update UI with incoming IM message
+    {
+        if (mLastChatTimer.hasExpired())
+        {   // Conversation went dead, reset
+            resetChat();
+        }
+        if (mChatSession.isNull() && mAIService)
+        {   // Start a new chat
+            // to do - check if ID is on allow list, etc - have some sort of access control?
+            mChatSession = sessionid;  // Save info
+            mChattyAgent = from_id;
+        }
+
         if (mChatSession.notNull() && mChatSession == sessionid)
-        {
+        {   // Get display name to use
+            LLAvatarName av_name;
+            if (LLAvatarNameCache::get(from_id, &av_name))
+            {
+                std::string new_name = av_name.getDisplayName(true);
+                if (new_name != mChattyDisplayName && new_name.size())
+                {
+                    std::string previous_name = mChattyDisplayName;
+                    mChattyDisplayName        = new_name;
+                    LL_INFOS("AIChat") << "Name change detected was chatting with " << previous_name << ", starting chat with "
+                                       << mChattyDisplayName << LL_ENDL;
+                    if (previous_name != mChattyDisplayName)
+                    {  // Send message to AI about chat change
+                        mAIService->sendChatTargetChangeMessage(previous_name, new_name);
+                    }
+                }
+            }
+
+            mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);    // Reset dead chat timer
+
             FSFloaterAIChat* floater = FSFloaterAIChat::getAIChatFloater();
             if (floater)
-            {
+            {   // Update UI with incoming IM message
                 FSPanelAIConversation* chat_panel = floater->getPanelConversation();
                 if (chat_panel)
                 {
@@ -282,7 +308,8 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
         }
         else
         {
-            LL_INFOS("AIChat") << "AI is in another chat, ignoring IM from " << from_id << " name " << name << LL_ENDL;
+            LL_INFOS("AIChat") << "AI is in another chat session " << mChatSession << " with " << mChattyAgent
+                               << ", ignoring IM from " << from_id << " name " << name << LL_ENDL;
         }
     }
     else
@@ -292,15 +319,48 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
 }
 
 
-bool FSAIChatMgr::sendChatToAIService(const std::string& message, bool request_direct)
+void FSAIChatMgr::sendChatToAIService(const std::string& message, bool request_direct)
 {  // Simple glue
     if (mAIService)
     {  // Send message to external AI chat service
         LL_INFOS("AIChat") << "Sending chat message to " << mAIService->getName() << " AI service" << LL_ENDL;
         return mAIService->sendChatToAIService(message, request_direct);
     }
-    return false;
 }
+
+
+void FSAIChatMgr::resetChat()
+{
+    mChatSession.setNull();  // Chat session id
+    mChattyAgent.setNull();  // Other agent
+    mChattyDisplayName.clear();
+    mAIChatHistory.clear();  // Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
+    mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);
+
+    FSFloaterAIChat* floater = FSFloaterAIChat::getAIChatFloater();
+    if (floater)
+    {
+        FSPanelAIDirect2LLM* direct_chat_panel = floater->getPanelDirect2LLM();
+        if (direct_chat_panel)
+        {
+            direct_chat_panel->resetChat();
+        }
+        else
+        {
+            LL_WARNS("AIChat") << "Unable to get AI direct chat panel for reset" << LL_ENDL;
+        }
+        FSPanelAIConversation* chat_panel = floater->getPanelConversation();
+        if (chat_panel)
+        {
+            chat_panel->resetChat();
+        }
+        else
+        {
+            LL_WARNS("AIChat") << "Unable to get AI chat conversation panel for reset" << LL_ENDL;
+        }
+    }
+}
+
 
 void FSAIChatMgr::processIncomingAIResponse(const std::string& ai_message, bool request_direct)
 {
@@ -321,7 +381,7 @@ void FSAIChatMgr::processIncomingAIResponse(const std::string& ai_message, bool 
             }
         }
         else
-        {   // Chat from / reply to AV
+        {   //  reply to other avatar's chat
             FSPanelAIConversation* chat_panel = floater->getPanelConversation();
             if (chat_panel)
             {

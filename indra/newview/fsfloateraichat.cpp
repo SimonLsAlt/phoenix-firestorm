@@ -305,6 +305,17 @@ bool FSPanelAIConversation::postBuild()
     // Code here should set up the panel UI after it's constructed
     const ai_chat_history_t& chat_history = FSAIChatMgr::getInstance()->getAIChatHistory();
 
+    LLButton* button = getChild<LLButton>(UI_AI_SEND_BTN);
+    if (button)
+    {
+        button->setCommitCallback(boost::bind(&FSPanelAIConversation::onSendMsgToAgent, this));
+    }
+    button = getChild<LLButton>(UI_AI_RESET_CHAT_BTN);
+    if (button)
+    {
+        button->setCommitCallback(boost::bind(&FSPanelAIConversation::onResetChat, this));
+    }
+
     LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
     LLTextBox*    tb = getChild<LLTextBox>(UI_AI_CHAT_MESSAGES);
     if (te && tb)
@@ -387,6 +398,40 @@ void FSPanelAIConversation::setAIReplyMessagePrompt(const std::string& service_n
     }
 }
 
+void FSPanelAIConversation::onSendMsgToAgent()
+{  // Callback for pressing "Send Message" button
+    LL_INFOS("AIChat") << "Conversation Send Message button pressed" << LL_ENDL;
+
+    // Get message text and send it via mgr.
+    LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
+    if (te)
+    {
+        const std::string& message = te->getValue().asStringRef();
+        // to do - send it
+    }
+}
+
+
+void FSPanelAIConversation::onResetChat()
+{  // Callback for pressing "Send Message" button
+    LL_INFOS("AIChat") << "Conversation Reset Chat button pressed" << LL_ENDL;
+    FSAIChatMgr::getInstance()->resetChat();
+}
+
+void FSPanelAIConversation::resetChat()  // override;
+{
+    LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
+    if (te)
+    {
+        te->setText(std::string());
+    }
+
+    LLTextBox* tb = getChild<LLTextBox>(UI_AI_CHAT_MESSAGES);
+    if (tb)
+    {
+        tb->setText(std::string());
+    }
+}
 
 
 
@@ -408,7 +453,6 @@ bool FSPanelAIDirect2LLM::postBuild()
         button->setCommitCallback(boost::bind(&FSPanelAIDirect2LLM::onSendMsgToLLM, this));
     }
 
-
     LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
     LLTextBox*    tb = getChild<LLTextBox>(UI_AI_CHAT_MESSAGES);
     if (te && tb)
@@ -428,7 +472,7 @@ void FSPanelAIDirect2LLM::onSendMsgToLLM()
 {   // Callback for pressing "Send Message" button
     LL_INFOS("AIChat") << "Direct2LLM Send Message button pressed" << LL_ENDL;
 
-    // Get message xtext and send it via mgr.
+    // Get message text and send it via mgr.
     LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
     if (te)
     {
@@ -439,18 +483,43 @@ void FSPanelAIDirect2LLM::onSendMsgToLLM()
 
 
 
-// Handle chat response from AI
+static void removeFirstLine(std::string & messages)
+{   // thanks chatGPT!
+    // Find the position of the first newline character
+    size_t newlinePos = messages.find('\n');
+
+    // If a newline is found, erase up to and including it
+    if (newlinePos != std::string::npos)
+    {
+        messages.erase(0, newlinePos + 1);
+    }
+    else
+    {   // If no newline is found, clear the string (there's only one line)
+        messages.clear();
+    }
+}
+
+
+static constexpr S32 MAX_AI_RESPONSE_BUFFER_SIZE = 5000;
+    // Handle chat response from AI
 void FSPanelAIDirect2LLM::displayIncomingAIResponse(const std::string& ai_message)
 {
-    LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
-    if (te)
+    LLTextBox* tb = getChild<LLTextBox>(UI_AI_CHAT_MESSAGES);
+    if (tb)
     {
-        // Set reply from AI
-        te->setText(ai_message);
+        // Add and display reply from AI
+        std::string messages = tb->getValue().asString();
+        while (messages.size() > MAX_AI_RESPONSE_BUFFER_SIZE)
+        {   // Don't let it grow forever
+            removeFirstLine(messages);
+        }
+        messages += LL_NEWLINE;
+        messages.append(ai_message);
+        tb->setText(messages);
     }
     else
     {
-        LL_WARNS("AIChat") << "Unexpected null child reply editor, can't show AI chat reply" << LL_ENDL;
+        LL_WARNS("AIChat") << "Unexpected null ai reply textbox, can't show AI chat reply" << LL_ENDL;
     }
 }
 
@@ -484,5 +553,20 @@ void FSPanelAIDirect2LLM::setAIServiceNamePrompts(const std::string& service_nam
     else
     {
         LL_WARNS("AIChat") << "Unexpected empty UI_AI_SEND_DIRECT_TO prompt, can't set display" << LL_ENDL;
+    }
+}
+
+void FSPanelAIDirect2LLM::resetChat()  // override;
+{
+    LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
+    if (te)
+    {
+        te->setText(std::string());
+    }
+
+    LLTextBox* tb = getChild<LLTextBox>(UI_AI_CHAT_MESSAGES);
+    if (tb)
+    {
+        tb->setText(std::string());
     }
 }

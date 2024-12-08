@@ -119,10 +119,20 @@
      height="24"
      follows="left|top"
      top_pad="-21"
-     left_pad="100"
+     left_pad="80"
      layout="topleft"
      label="Send Reply"
      name="ai_send_btn"
      width="120" />
 
+    <button
+     enabled="true"
+     height="24"
+     follows="left|top"
+     top_pad="-23"
+     left_pad="30"
+     layout="topleft"
+     label="Reset Chat"
+     name="ai_reset_chat_btn"
+     width="120" />
 </panel>

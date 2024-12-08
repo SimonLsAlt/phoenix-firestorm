@@ -58,17 +58,17 @@ inline constexpr char AI_CHARACTER_ID_PROMPT[] = "character_id_prompt";
 inline constexpr char AI_CHARACTER_ID[] = "character_id";
 
 // Elements in the conversation tab
-inline constexpr char UI_AI_CHAT_WITH[] = "ai_chat_with";
-inline constexpr char UI_AI_CHAT_FROM[] = "ai_chat_from";
-inline constexpr char UI_AI_CHAT_MESSAGES[] = "ai_chat_messages";
-inline constexpr char UI_AI_CHAT_EDITOR[]   = "ai_chat_editor";
+inline constexpr char UI_AI_CHAT_WITH[]      = "ai_chat_with";
+inline constexpr char UI_AI_CHAT_FROM[]      = "ai_chat_from";
+inline constexpr char UI_AI_CHAT_MESSAGES[]  = "ai_chat_messages";
+inline constexpr char UI_AI_CHAT_EDITOR[]    = "ai_chat_editor";
+inline constexpr char UI_AI_RESET_CHAT_BTN[] = "ai_reset_chat_btn";
 
 // Elements in the direct2LLM tab
 inline constexpr char UI_AI_DIRECT_LLM_CHAT_WITH[] = "ai_direct_llm_chat_with";
 inline constexpr char UI_AI_SEND_DIRECT_TO[]       = "ai_send_direct_to";
 inline constexpr char UI_AI_SEND_BTN[]             = "ai_send_btn";
 // also uses UI_AI_CHAT_EDITOR and UI_AI_CHAT_MESSAGES
-
 
 inline constexpr char UI_AI_BOTS_PANELS[] = "ai_bots_panels";
 

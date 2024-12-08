@@ -72,6 +72,8 @@ public:
     // Setting mChattyAgent happens when new session is set up
     const LLUUID&   getChattyAgent() const { return mChattyAgent; };
 
+    const std::string& getChattyDisplayName() const                  { return mChattyDisplayName; };
+    void               setChattyDisplayName(const std::string& name) { mChattyDisplayName = name; };
 
     void            processIncomingChat(const LLUUID& from_id,
                                         const std::string& message,
@@ -80,7 +82,9 @@ public:
     void            processIncomingAIResponse(const std::string& ai_message, bool request_direct);
     void            setAIReplyMessagePrompt();
 
-    bool            sendChatToAIService(const std::string& message, bool request_direct);
+    void            sendChatToAIService(const std::string& message, bool request_direct);
+
+    void            resetChat();
 
     const ai_chat_history_t& getAIChatHistory() const { return mAIChatHistory; };
 
@@ -89,10 +93,12 @@ public:
     void            createAIService(const std::string& ai_service_name);  // Creates service object mAIService
     void            trimAIChatHistoryData();      // Limit history storage
 
-    LLUUID       mChatSession;      // Chat session id
-    LLUUID       mChattyAgent;      // Other agent
-    FSAIService* mAIService;        // Interface to external AI chat service
-    LLSD         mAIConfig;         // Configuration values for AI back end
+    LLUUID          mChatSession;        // Chat session id
+    LLUUID          mChattyAgent;        // Other agent
+    std::string     mChattyDisplayName;  // Name of other agent to use in conversation
+    FSAIService*    mAIService;          // Interface to external AI chat service
+    LLSD            mAIConfig;           // Configuration values for AI back end
+    LLFrameTimer      mLastChatTimer;     // Track time so we can drop dead chat sessions
     ai_chat_history_t mAIChatHistory;    // Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
 };
 #endif
