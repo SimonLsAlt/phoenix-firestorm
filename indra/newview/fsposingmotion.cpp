@@ -32,7 +32,7 @@
 FSPosingMotion::FSPosingMotion(const LLUUID &id) : LLMotion(id)
 {
     mName = "fs_poser_pose";
-    _motionID = id;
+    mMotionID = id;
 }
 
 LLMotion::LLMotionInitStatus FSPosingMotion::onInitialize(LLCharacter *character)
@@ -40,7 +40,7 @@ LLMotion::LLMotionInitStatus FSPosingMotion::onInitialize(LLCharacter *character
     if (!character)
         return STATUS_FAILURE;
 
-    _jointPoses.clear();
+    mJointPoses.clear();
 
     LLJoint* targetJoint;
     for (S32 i = 0; (targetJoint = character->getCharacterJoint(i)); ++i)
@@ -48,8 +48,8 @@ LLMotion::LLMotionInitStatus FSPosingMotion::onInitialize(LLCharacter *character
         if (!targetJoint)
             continue;
 
-        FSJointPose jointPose = FSJointPose(targetJoint);
-        _jointPoses.push_back(jointPose);
+        FSJointPose jointPose = FSJointPose(targetJoint, POSER_JOINT_STATE);
+        mJointPoses.push_back(jointPose);
 
         addJointState(jointPose.getJointState());
     }
@@ -59,8 +59,8 @@ LLMotion::LLMotionInitStatus FSPosingMotion::onInitialize(LLCharacter *character
         if (!targetJoint)
             continue;
 
-        FSJointPose jointPose = FSJointPose(targetJoint, true);
-        _jointPoses.push_back(jointPose);
+        FSJointPose jointPose = FSJointPose(targetJoint, POSER_JOINT_STATE, true);
+        mJointPoses.push_back(jointPose);
 
         addJointState(jointPose.getJointState());
     }
@@ -68,7 +68,10 @@ LLMotion::LLMotionInitStatus FSPosingMotion::onInitialize(LLCharacter *character
     return STATUS_SUCCESS;
 }
 
-bool FSPosingMotion::onActivate() { return true; }
+bool FSPosingMotion::onActivate()
+{
+    return true;
+}
 
 bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
 {
@@ -79,7 +82,7 @@ bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
     LLVector3 currentScale;
     LLVector3 targetScale;
 
-    for (FSJointPose jointPose : _jointPoses)
+    for (FSJointPose jointPose : mJointPoses)
     {
         LLJoint* joint = jointPose.getJointState()->getJoint();
         if (!joint)
@@ -88,25 +91,25 @@ bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
         currentRotation = joint->getRotation();
         currentPosition = joint->getPosition();
         currentScale = joint->getScale();
-        targetRotation = jointPose.getTargetRotation();
-        targetPosition = jointPose.getTargetPosition();
-        targetScale = jointPose.getTargetScale();
+        targetRotation  = jointPose.getTargetRotation();
+        targetPosition  = jointPose.getTargetPosition();
+        targetScale     = jointPose.getTargetScale();
 
         if (currentPosition != targetPosition)
         {
-            currentPosition = lerp(currentPosition, targetPosition, _interpolationTime);
+            currentPosition = lerp(currentPosition, targetPosition, mInterpolationTime);
             jointPose.getJointState()->setPosition(currentPosition);
         }
 
         if (currentRotation != targetRotation)
         {
-            currentRotation = slerp(_interpolationTime, currentRotation, targetRotation);
+            currentRotation = slerp(mInterpolationTime, currentRotation, targetRotation);
             jointPose.getJointState()->setRotation(currentRotation);
         }
 
         if (currentScale != targetScale)
         {
-            currentScale = lerp(currentScale, targetScale, _interpolationTime);
+            currentScale = lerp(currentScale, targetScale, mInterpolationTime);
             jointPose.getJointState()->setScale(currentScale);
         }
     }
@@ -118,7 +121,7 @@ void FSPosingMotion::onDeactivate() { revertChangesToPositionsScalesAndCollision
 
 void FSPosingMotion::revertChangesToPositionsScalesAndCollisionVolumes()
 {
-    for (FSJointPose jointPose : _jointPoses)
+    for (FSJointPose jointPose : mJointPoses)
     {
         jointPose.revertJointScale();
         jointPose.revertJointPosition();
@@ -176,13 +179,19 @@ void FSPosingMotion::removeJointFromState(FSJointPose* joint)
     setJointState(avJoint, 0);
 }
 
-void FSPosingMotion::addJointToState(LLJoint* joint) { setJointState(joint, POSER_JOINT_STATE); }
-
-void FSPosingMotion::removeJointFromState(LLJoint *joint) { setJointState(joint, 0); }
-
-void FSPosingMotion::setJointState(LLJoint *joint, U32 state)
+void FSPosingMotion::addJointToState(LLJoint* joint)
 {
-    if (_jointPoses.size() < 1)
+    setJointState(joint, POSER_JOINT_STATE);
+}
+
+void FSPosingMotion::removeJointFromState(LLJoint* joint)
+{
+    setJointState(joint, 0);
+}
+
+void FSPosingMotion::setJointState(LLJoint* joint, U32 state)
+{
+    if (mJointPoses.size() < 1)
         return;
     if (!joint)
         return;
@@ -204,13 +213,12 @@ void FSPosingMotion::setJointState(LLJoint *joint, U32 state)
     addJointState(jointPose->getJointState());
 }
 
-FSPosingMotion::FSJointPose* FSPosingMotion::getJointPoseByJointName(std::string name)
+FSJointPose* FSPosingMotion::getJointPoseByJointName(const std::string& name)
 {
-    if (_jointPoses.size() < 1)
+    if (mJointPoses.size() < 1)
         return nullptr;
 
-    std::vector<FSPosingMotion::FSJointPose>::iterator poserJoint_iter;
-    for (poserJoint_iter = _jointPoses.begin(); poserJoint_iter != _jointPoses.end(); ++poserJoint_iter)
+    for (auto poserJoint_iter = mJointPoses.begin(); poserJoint_iter != mJointPoses.end(); ++poserJoint_iter)
     {
         if (!boost::iequals(poserJoint_iter->jointName(), name))
             continue;
@@ -223,7 +231,7 @@ FSPosingMotion::FSJointPose* FSPosingMotion::getJointPoseByJointName(std::string
 
 bool FSPosingMotion::currentlyPosingJoint(LLJoint* joint)
 {
-    if (_jointPoses.size() < 1)
+    if (mJointPoses.size() < 1)
         return false;
 
     if (!joint)
@@ -240,3 +248,30 @@ bool FSPosingMotion::currentlyPosingJoint(LLJoint* joint)
     U32 state = jointState->getUsage();
     return (state & POSER_JOINT_STATE);
 }
+
+bool FSPosingMotion::allStartingRotationsAreZero() const
+{
+    for (auto poserJoint_iter = mJointPoses.begin(); poserJoint_iter != mJointPoses.end(); ++poserJoint_iter)
+    {
+        if (poserJoint_iter->isCollisionVolume())
+            continue;
+
+        if (!poserJoint_iter->isBaseRotationZero())
+            return false;
+    }
+
+    return true;
+}
+
+void FSPosingMotion::setAllRotationsToZero()
+{
+    for (auto poserJoint_iter = mJointPoses.begin(); poserJoint_iter != mJointPoses.end(); ++poserJoint_iter)
+        poserJoint_iter->zeroBaseRotation();
+}
+
+constexpr size_t MaximumUndoQueueLength = 20;
+
+/// <summary>
+/// The constant time interval, in seconds, specifying whether an 'undo' value should be added.
+/// </summary>
+constexpr std::chrono::duration<double> UndoUpdateInterval = std::chrono::duration<double>(0.3);

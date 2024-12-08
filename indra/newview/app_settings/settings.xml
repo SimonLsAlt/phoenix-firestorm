@@ -2253,7 +2253,7 @@
       <key>Type</key>
       <string>U32</string>
       <key>Value</key>
-      <integer>120</integer>
+      <integer>60</integer>
     </map>
     <key>BackgroundYieldTime</key>
     <map>
@@ -8056,16 +8056,27 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
-  <key>FSPoserSaveBvhFileAlso</key>
+  <key>FSPoserResetBaseRotationOnEdit</key>
   <map>
     <key>Comment</key>
-    <string>Whether to save a BVH file as well when saving a pose.</string>
+    <string>Whether to reset the base-rotation of a joint to zero when a user edits it.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
     <integer>0</integer>
+  </map>
+  <key>FSPoserStopPosingWhenClosed</key>
+  <map>
+    <key>Comment</key>
+    <string>Whether to stop animating with the poser when the poser window is closed.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
   </map>
   <key>FSPoserTrackpadSensitivity</key>
   <map>
@@ -24074,7 +24085,7 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>1</integer>
     </map>
     <key>FSSoundCacheLocation</key>
     <map>
@@ -24776,6 +24787,7 @@ Change of this parameter will affect the layout of buttons in notification toast
         <string>ja</string>
         <string>pl</string>
         <string>ru</string>
+        <string>zh</string>
       </array>
     </map>
     <key>FSRememberUsername</key>
@@ -25190,6 +25202,17 @@ Change of this parameter will affect the layout of buttons in notification toast
     <map>
       <key>Comment</key>
       <string>If enabled, auto-accepted inventory items will be logged to nearby chat.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSShowAutoAcceptInventoryInNotifications</key>
+    <map>
+      <key>Comment</key>
+      <string>If enabled, auto-accepted inventory items will be shown in notifications.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -25915,6 +25938,17 @@ Change of this parameter will affect the layout of buttons in notification toast
       <integer>1</integer>
       <key>Persist</key>
       <integer>0</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>FSShowWhitelistReminder</key>
+    <map>
+      <key>Comment</key>
+      <string>Show the whitelist reminder on first install.</string>
+      <key>Persist</key>
+      <integer>1</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
