@@ -46,20 +46,20 @@
      visible="true"
      width="120">
         <combo_box.item
-         label="Kindroid.ai"
-         name="item0"
+         label="Kindroid.ai (future)"
+         name="Kindroid.ai"
          value="Kindroid.ai" />
         <combo_box.item
          label="Nomi.ai"
-         name="item1"
+         name="Nomi.ai"
          value="Nomi.ai" />
         <combo_box.item
          label="OpenAI"
-         name="item3"
+         name="OpenAI"
          value="OpenAI" />
         <combo_box.item
-         label="LM Studio"
-         name="item4"
+         label="LM Studio (future)"
+         name="LMStudio"
          value="LMStudio" />
     </combo_box>
 
@@ -146,13 +146,12 @@
      max_length_bytes="256"
      name="character_id"
      width="320" />
-
     <button
      enabled="true"
-     follows="top"
      top_pad="12"
      layout="topleft"
      left="20"
+     top="410"
      height="24"
      label="Apply"
      name="apply_btn"

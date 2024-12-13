@@ -49,7 +49,7 @@ FSAIService::~FSAIService()
 
 // static simple utility
 const LLSD& FSAIService::getAIConfig()
-{
+{   // to do - replace with config storaged in service
 	return FSAIChatMgr::getInstance()->getAIConfig();
 };
 
@@ -82,6 +82,44 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
     return ai_service;
 };
 
+
+// virtual but useful base class
+bool FSAIService::okToSendChatToAIService(const std::string& message, bool request_direct)
+{
+    // to do - better config testing, use validateConfig()
+    std::string base_url = getAIConfig().get(AI_ENDPOINT);
+    if (base_url.empty())
+    {
+        LL_WARNS("AIChat") << "Failed to get URL to back-end AI chat service, check the AI configuration panel" << LL_ENDL;
+        LL_WARNS("AIChat") << "getAIConfig() is " << getAIConfig() << LL_ENDL;
+        return false;
+    }
+
+    if (getRequestBusy())
+    {  // Already have a chat request in-flight to AI LLM.   Save it to resend
+        if (mNextMessage.size() == 0)
+        {
+            mNextMessage       = message;
+            mNextMessageDirect = request_direct;
+            LL_INFOS("AIChat") << "Saving outgoing message since another is in-flight: " << message << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS("AIChat") << "AI request is busy - dropping message.   Already have one waiting.  Dropping message: " << message
+                               << LL_ENDL;
+        }
+        return false;
+    }
+
+    if (messageToAIShouldBeDropped(message, request_direct))
+    {  // messageToAIShouldBeDropped() will log about anything interesting
+        return false;
+    }
+
+    // OK to send message to AI
+    return true;
+}
+
 // ------------------------------------------------
 // Use nomi.ai
 
@@ -98,12 +136,12 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
 
 FSAINomiService::FSAINomiService(const std::string& name) : FSAIService(name)
 {
-    LL_INFOS("AIChat") << "created FSAINomiService" << LL_ENDL;	
+    LL_DEBUGS("AIChat") << "created FSAINomiService" << LL_ENDL;
 };
 
 FSAINomiService::~FSAINomiService()
 {
-    LL_INFOS("AIChat") << "deleting FSAINomiService" << LL_ENDL;
+    LL_DEBUGS("AIChat") << "deleting FSAINomiService" << LL_ENDL;
 };
 
 // Called with new config values before they are stored
@@ -115,37 +153,20 @@ bool FSAINomiService::validateConfig(const LLSD& config)
 
 void FSAINomiService::sendChatToAIService(const std::string& message, bool request_direct)
 {  // Send message to the AI service
-    std::string url  = getAIConfig().get(AI_ENDPOINT);
-    if (url.empty())
-	{
-        LL_WARNS("AIChat") << "Failed to get URL to back-end AI chat service, check the AI configuration panel" << LL_ENDL;
-        LL_WARNS("AIChat") << "getAIConfig() is " << getAIConfig() << LL_ENDL;
-    }
-	else if (getRequestBusy())
-	{   // Already have a chat request in-flight to AI LLM.   Save it to resend
-        if (mNextMessage.size() == 0)
-        {
-            mNextMessage = message;
-            mNextMessageDirect = request_direct;
-            LL_INFOS("AIChat") << "Saving outgoing message since another is in-flight: " << message << LL_ENDL;
-        }
-        else
-        {
-            LL_WARNS("AIChat") << "AI request is busy - dropping message.   Already have one waiting.  Dropping message: " << message << LL_ENDL;
-        }
-	}
-    else if (messageToAIShouldBeDropped(message, request_direct))
-    {   // messageToAIShouldBeDropped() will log about anything interesting
+    if (!okToSendChatToAIService(message, request_direct))
+    {
         return;
     }
-    else
-    {   // Send message via coroutine
-        mRequestDirect = request_direct;
-        LL_INFOS("AIChat") << "Sending " << (mRequestDirect ? "direct" : "regular") << " AI chat request to " << url << ": " << message << LL_ENDL;
-        setRequestBusy();
-        LLCoros::instance().launch("FSAINomiService::getAIResponseCoro",
-                                   boost::bind(&FSAINomiService::getAIResponseCoro, this, url, message));
-    }
+
+    mRequestDirect  = request_direct;
+
+    std::string url = getAIConfig().get(AI_ENDPOINT);
+    // Send message via coroutine
+    LL_DEBUGS("AIChat") << "Sending " << (mRequestDirect ? "direct" : "regular") << " AI chat request to " << url << ": " << message
+                        << LL_ENDL;
+    setRequestBusy();
+    LLCoros::instance().launch("FSAINomiService::sendMessageToAICoro",
+                                boost::bind(&FSAINomiService::sendMessageToAICoro, this, url, message));
 }
 
 
@@ -170,11 +191,11 @@ bool FSAINomiService::messageToAIShouldBeDropped(const std::string& message, boo
     return false;
 }
 
-bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::string& message)
+bool FSAINomiService::sendMessageToAICoro(const std::string& url, const std::string& message)
 {
-    LLCore::HttpRequest::policy_t               httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t                  httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
 
     LLCore::HttpHeaders::ptr_t headers = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
     headers->append(HTTP_OUT_HEADER_AUTHORIZATION, getAIConfig().get(AI_API_KEY));
@@ -182,17 +203,17 @@ bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::strin
 
 	LLSD body = LLSD::emptyMap();
     body["messageText"] = message;
-    LLSD req_response = httpAdapter->postJsonAndSuspend(httpRequest, url, body, headers);
+    LLSD req_response = http_adapter->postJsonAndSuspend(http_request, url, body, headers);
 
     LLSD    http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
 
-    LL_INFOS("AIChat") << "getAIResponseCoro returned status " << status.getStatus()
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro returned status " << status.getStatus()
                        << " and http_results: " << http_results << LL_ENDL;
 
 	if (status.getStatus() == 0)
 	{
-        LL_INFOS("AIChat") << "AI response:  " << req_response.get("replyMessage") << LL_ENDL;
+        LL_DEBUGS("AIChat") << "AI response:  " << req_response.get("replyMessage") << LL_ENDL;
         std::string ai_message = req_response.get("replyMessage").get("text");
 
         if (boost::starts_with(ai_message, "(OOC:"))
@@ -202,7 +223,7 @@ bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::strin
             {
                 std::string ooc_part = ai_message.substr(0, close_paren + 1);
                 ai_message.erase(0, close_paren + 1);
-                LL_INFOS("AIChat") << "Removing OOC part of chat reply:  " << ooc_part << ", leaving message " << ai_message << LL_ENDL;
+                LL_DEBUGS("AIChat") << "Removing OOC part of chat reply:  " << ooc_part << ", leaving message " << ai_message << LL_ENDL;
                 FSAIChatMgr::getInstance()->processIncomingAIResponse(ooc_part, mRequestDirect);  // Handle OOC part
                 mRequestDirect = false;     // Pass rest of it to conversation
             }
@@ -234,16 +255,17 @@ bool FSAINomiService::getAIResponseCoro(const std::string& url, const std::strin
         mNextMessage.clear();
         mRequestDirect = mNextMessageDirect;
         setRequestBusy();
-        LLCoros::instance().launch("FSAINomiService::getAIResponseCoro",
-                                   boost::bind(&FSAINomiService::getAIResponseCoro, this, url, message));
+        LLCoros::instance().launch("FSAINomiService::sendMessageToAICoro",
+                                   boost::bind(&FSAINomiService::sendMessageToAICoro, this, url, message));
     }
 
     return true;
 }
 
 
-void FSAINomiService::sendChatTargetChangeMessage(const std::string& previous_name, const std::string& new_name)
-{  // Caller should ensure there is a name change and new_name is not empty
+void FSAINomiService::aiChatTargetChanged(const std::string& previous_name, const std::string& new_name)
+{   // Caller should ensure there is a name change and new_name is not empty
+    // Send an OOC: message about the new conversation
     static std::string chat_ai_previous("  Do not mention [PREVIOUS_NAME].");        // tbd - translate?
     static std::string chat_ai_new("(OOC: You are now talking with [NEW_NAME].  Do not mention any other people you have been talking with.");
 
@@ -290,53 +312,45 @@ void FSAILMStudioService::sendChatToAIService(const std::string& message, bool r
     std::string url;    // to do - get value and fill out request data
     if (!url.empty())
     {
-        LLCoros::instance().launch("FSAILMStudioService::getAIResponseCoro",
-                                   boost::bind(&FSAILMStudioService::getAIResponseCoro, this, url, message));
+        LLCoros::instance().launch("FSAILMStudioService::sendMessageToAICoro",
+                                   boost::bind(&FSAILMStudioService::sendMessageToAICoro, this, url, message));
     }
 }
 
-bool FSAILMStudioService::getAIResponseCoro(const std::string& url, const std::string& message)
+bool FSAILMStudioService::sendMessageToAICoro(const std::string& url, const std::string& message)
 {
-    // To do - add flag showing a request is in flight
- 
-    LLCore::HttpRequest::policy_t               httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t                  httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
 
-    LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
+    LLSD result = http_adapter->getJsonAndSuspend(http_request, url);
 
     LLSD               httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status      = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
 	// to do - fix for proper request - POST ?
-    LL_INFOS("AIChat") << "getAIResponseCoro returned status " << status.getStatus() << " and content: "
+    LL_INFOS("AIChat") << "sendMessageToAICoro returned status " << status.getStatus() << " and content: "
                        << result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_CONTENT] << LL_ENDL;
 
-    if (!status)
-    {
-        return false;
-    }
-
- /*   if (result.has(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_CONTENT) &&
-        result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_CONTENT].isArray())
-    {
-        mSkuDescriptions = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_CONTENT];
-    }
-    else
-    {
-        LL_WARNS() << "Land SKU description response is malformed" << LL_ENDL;
-    }*/
-
-	return true;
+	return (bool) status;
 }
 
 
 
 // ------------------------------------------------
-// Use local LLM via OpenAI
+// Use OpenAI
+
+// Create new thread with each new chat av / session
+// To send a message:
+//    Add a message to the thread with role ‘user’ and incoming chat as ‘content’
+//    Run it
+//    Get run
+//      loop - check status to be completed or error
+//    Get the last message
+
 FSAIOpenAIService::FSAIOpenAIService(const std::string& name) : FSAIService(name)
 {  // Call base class constructor
-    LL_INFOS("AIChat") <<"FSAIOpenAIService created with name: " << name<< LL_ENDL;
+    LL_INFOS("AIChat") <<"FSAIOpenAIService created with name: " << name << LL_ENDL;
 }
 
 // Destructor
@@ -348,9 +362,32 @@ FSAIOpenAIService::~FSAIOpenAIService()
 // sendChat override
 void FSAIOpenAIService::sendChatToAIService(const std::string& message, bool request_direct)
 {
+    if (!okToSendChatToAIService(message, request_direct))
+    {
+        return;
+    }
+
+    LL_DEBUGS("AIChat") << "sendChat called with message: " << message << LL_ENDL;
     mRequestDirect = request_direct;
-    LL_INFOS("AIChat") <<"sendChat called with message: " << message << LL_ENDL;
+    
+    std::string base_url = getAIConfig().get(AI_ENDPOINT);
+
+    // Send message via coroutine
+    LL_DEBUGS("AIChat") << "Sending " << (mRequestDirect ? "direct" : "regular") << " AI chat request to " << base_url << ": "
+                        << message
+                        << LL_ENDL;
+    setRequestBusy();
+    LLCoros::instance().launch("FSAIOpenAIService::sendMessageToAICoro",
+                               boost::bind(&FSAIOpenAIService::sendMessageToAICoro, this, base_url, message));
 }
+
+// aiChatTargetChanged override
+void FSAIOpenAIService::aiChatTargetChanged(const std::string& previous_name, const std::string& new_name)
+{
+    LL_INFOS("AIChat") << "aiChatTargetChanged called chat switch from " << previous_name << " to " << new_name << LL_ENDL;
+    // to do - create new thread, zap old one?
+}
+
 
 // validateConfig override
 bool FSAIOpenAIService::validateConfig(const LLSD& config)
@@ -360,11 +397,337 @@ bool FSAIOpenAIService::validateConfig(const LLSD& config)
     return true;
 }
 
-// getAIResponseCoro
-bool FSAIOpenAIService::getAIResponseCoro(const std::string& url, const std::string& message)
+// sendMessageToAICoro
+bool FSAIOpenAIService::sendMessageToAICoro(const std::string& url, const std::string& message)
 {
-    LL_INFOS("AIChat") <<"getAIResponseCoro called with URL: " << url << " and message: " << message<< LL_ENDL;
-    // Placeholder logic
+    LL_INFOS("AIChat") <<"sendMessageToAICoro called with URL: " << url << " and message: " << message<< LL_ENDL;
+
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+
+    // Headers used for most of the POST operations
+    LLCore::HttpHeaders::ptr_t post_headers = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
+    std::string auth_header = getAIConfig().get(AI_API_KEY).asString();
+    if (!boost::starts_with(auth_header, "Bearer "))
+    {   // openAI wants "Authorization: Bearer <api key>"
+        auth_header = std::string("Bearer ").append(auth_header);
+    }
+    post_headers->append(HTTP_OUT_HEADER_AUTHORIZATION, auth_header);
+    post_headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_JSON);
+    post_headers->append("OpenAI-Beta", "assistants=v2");
+
+    // Headers used for the GET operations
+    LLCore::HttpHeaders::ptr_t get_headers = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
+    get_headers->append(HTTP_OUT_HEADER_AUTHORIZATION, auth_header);
+    get_headers->append("OpenAI-Beta", "assistants=v2");
+
+    LLSD               body = LLSD::emptyMap();
+    LLSD               req_response;
+    LLSD               http_results;
+    LLCore::HttpStatus status;
+    std::string        openai_url;
+    std::string        base_url(url);
+    if (!boost::ends_with(base_url, "/"))
+    {
+        base_url.append("/");
+    }
+    std::string run_status;
+
+    // Step 1 : create thread if there isn't one yet
+    if (mOpenAIThread.empty())
+    {
+        openai_url = base_url;
+        openai_url.append("threads");
+        req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, post_headers);
+
+        http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+        status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+        LL_DEBUGS("AIChat") << "creating openAI thread returned status " << status.getStatus() << " and http_results: " << http_results
+                            << LL_ENDL;
+
+        if (status.getStatus() != 0)
+        {
+            LL_WARNS("AIChat") << "Unable to make OpenAI thread from " << openai_url << ", fix configuration settings?" << LL_ENDL;
+            setRequestBusy(false);
+            return false;
+        }
+
+        // { "id" : "thread_Wup24tssocSFdvYDiN8xibvc", "object" : "thread", "created_at" : 1733957473, "metadata" : {}, "tool_resources": {} }
+        mOpenAIThread = req_response.get("id").asString();
+        LL_DEBUGS("AIChat") << "OpenAI thread set to " << mOpenAIThread << LL_ENDL;
+    }
+
+    // Step 2 : add message to the thread
+
+    openai_url = base_url;     // build url:  api.openai.com/v1/threads/$OPENAI_THREAD/messages
+    openai_url.append("threads/");
+    openai_url.append(mOpenAIThread);
+    openai_url.append("/messages");
+
+    body = LLSD::emptyMap();
+    body["role"] = "user";
+    body["content"] = message;
+
+    req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, post_headers);
+    http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "OpenAI adding message to thread returned status " << status.getStatus() << " and http_results: " << http_results << LL_ENDL;
+
+    if (status.getStatus() != 0)
+    {
+        LL_WARNS("AIChat") << "Unable to add message to OpenAI thread from " << openai_url << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    //{     Need to use any of these values?
+    //    "id": "msg_D2jTGwoI6TAzc4zgYkZGOEfs",
+    //    "object": "thread.message",
+    //    "created_at": 1733957632,
+    //    "assistant_id": null,
+    //    "thread_id": "thread_Wup04tssocSFdvYDiN8xibvc",
+    //    "run_id": null,
+    //    "role": "user",
+    //    "content": [{ "type": "text", "text": { "value": "What is the best way to cook shrimp?", "annotations": [] } }],
+    //    "attachments": [],
+    //    "metadata": {}
+    //}
+
+    // Step 3 :  create a run
+
+    openai_url = base_url;  // build url:  api.openai.com/v1/threads/$OPENAI_THREAD/runs
+    openai_url.append("threads/");
+    openai_url.append(mOpenAIThread);
+    openai_url.append("/runs");
+
+    body = LLSD::emptyMap();
+    body["assistant_id"] = getAIConfig().get(AI_CHARACTER_ID);
+    // body["max_tokens"] = 100;
+    req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, post_headers);
+    http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "OpenAI creating a run returned status " << status.getStatus()
+                        << " and http_results: " << http_results << LL_ENDL;
+
+    if (status.getStatus() != 0)
+    {
+        LL_WARNS("AIChat") << "Unable to create OpenAI run from " << openai_url << ", fix configuration settings?" << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    //{     results
+    //    "id": "run_3fBoJ5ipXZPeieGMZhtJQa27",
+    //    "object": "thread.run",
+    //    "created_at": 1733957999,
+    //    "assistant_id": "asst_3sSIOJIb5PnQTvwxne5218t4",
+    //    "thread_id": "thread_Wup04tssqrpwdvYDiN8xibvc",
+    //    "status": "queued",
+    //    "started_at": null,
+    //    "expires_at": 1733958599,
+    //    "cancelled_at": null,
+    //    "failed_at": null,
+    //    "completed_at": null,
+    //    "required_action": null,
+    //    "last_error": null,
+    //    "model": "gpt-4o-mini",
+    //    "instructions": "",
+    //    "tools": [],
+    //    "tool_resources": {},
+    //    "metadata": {},
+    //    "temperature": 1.0,
+    //    "top_p": 1.0,
+    //    "max_completion_tokens": null,
+    //    "max_prompt_tokens": null,
+    //    "truncation_strategy": { "type": "auto", "last_messages": null },
+    //    "incomplete_details": null,
+    //    "usage": null,
+    //    "response_format": "auto",
+    //    "tool_choice": "auto",
+    //    "parallel_tool_calls": true
+    //}
+
+    run_status = req_response.get("status").asString();
+    if (run_status != "queued" && run_status != "in_progress")
+    {
+        LL_WARNS("AIChat") << "Expected OpenAI run to be 'queued' or 'in_progress': " << req_response << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    mOpenAIRun = req_response.get("id").asString();
+    LL_DEBUGS("AIChat") << "OpenAI run set to " << mOpenAIRun << LL_ENDL;
+
+    // Step 4 : check and wait for run to complete
+
+    openai_url = base_url;  // build url:  https://api.openai.com/v1/threads/$OPENAI_THREAD/runs/$OPENAI_RUN_ID
+    openai_url.append("threads/");
+    openai_url.append(mOpenAIThread);
+    openai_url.append("/runs/");
+    openai_url.append(mOpenAIRun);
+
+    const F32 SECS_BETWEEN_REQUESTS = 1.f;
+    const F32 AI_EXPIRED_TIMEOUT = 30.f;  // seconds
+
+    LLTimer ai_wait_timer;
+    ai_wait_timer.setTimerExpirySec(AI_EXPIRED_TIMEOUT);
+    S32 ai_wait_req_count = 0;
+
+    while (true)
+    {
+        llcoro::suspendUntilTimeout(SECS_BETWEEN_REQUESTS);
+
+        ai_wait_req_count++;
+        req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, post_headers);
+        http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+        status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+        LL_DEBUGS("AIChat") << "OpenAI getting run info count " << ai_wait_req_count << " to " << openai_url << " returned status "
+                            << status.getStatus() << " and req_response: " << req_response << LL_ENDL;
+
+        if (status.getStatus() != 0)
+        {
+            LL_WARNS("AIChat") << "Unable to get OpenAI run status " << openai_url << " after " << ai_wait_req_count << " checks"
+                               << " and " << ai_wait_timer.getElapsedTimeF32() << " seconds" << LL_ENDL;
+            setRequestBusy(false);
+            return false;
+        }
+        // results
+        //{
+        //    "id": "run_3fBoJ5ipXZPeieGMZhtJQa27",
+        //    "object": "thread.run",
+        //    "created_at": 1733957999,
+        //    "assistant_id": "asst_3sSIOJIb3PnQTENXne5jD8t4",
+        //    "thread_id": "thread_Wup04tssocSFdvYDiN8xibvc",
+        //    "status": "completed",
+        //    "started_at": 1733957999,
+        //    "expires_at": null,
+        //    "cancelled_at": null,
+        //    "failed_at": null,
+        //    "completed_at": 1733958005,
+        //    "required_action": null,
+        //    "last_error": null,
+        //    "model": "gpt-4o-mini",
+        //    "tools": [],
+        //    "tool_resources": {},
+        //    "metadata": {},
+        //    "temperature": 1.0,
+        //    "top_p": 1.0,
+        //    "max_completion_tokens": null,
+        //    "max_prompt_tokens": null,
+        //    "truncation_strategy": { "type": "auto", "last_messages": null },
+        //    "incomplete_details": null,
+        //    "usage":
+        //        { "prompt_tokens": 51, "completion_tokens": 339, "total_tokens": 390, "prompt_token_details": { "cached_tokens": 0 } },
+        //    "response_format": "auto",
+        //    "tool_choice": "auto",
+        //    "parallel_tool_calls": true
+        //}
+
+        // Possible status values:  queued, in_progress, requires_action, cancelling, cancelled, failed, completed, incomplete, expired
+        // https://platform.openai.com/docs/api-reference/runs/object
+        run_status = req_response.get("status").asString();
+        if (run_status == "completed")
+        {
+            LL_INFOS("AIChat") << "OpenAI run completed after " << ai_wait_req_count << " checks and "
+                               << ai_wait_timer.getElapsedTimeF32() << " seconds" << LL_ENDL;
+            break;      // yay!
+        }
+
+        LL_DEBUGS("AIChat") << "OpenAI run status response after " << ai_wait_req_count << " checks and "
+                            << ai_wait_timer.getElapsedTimeF32() << " seconds: " << req_response << LL_ENDL;
+
+        // Check for problems
+        if (run_status == "requires_action" || run_status == "cancelling" || run_status == "cancelled" ||
+            run_status == "failed" || run_status == "expired")
+        {
+            LL_WARNS("AIChat") << "Error OpenAI run status " << run_status << " after " << ai_wait_req_count << " checks"
+                               << " and " << ai_wait_timer.getElapsedTimeF32() << " seconds" << LL_ENDL;
+            setRequestBusy(false);
+            return false;
+        }
+
+        if (ai_wait_timer.hasExpired())
+        {   // Check for our own timeout
+            LL_WARNS("AIChat") << "OpenAI request run timeout, still running after " << ai_wait_req_count << " checks and "
+                               << ai_wait_timer.getElapsedTimeF32() << " seconds.  Last req_response:" << req_response << LL_ENDL;
+            setRequestBusy(false);
+            return false;
+        }
+    }   // End loop sleeping and checking run status
+
+    // Step 5 : get the most recent message
+
+    openai_url = base_url;  // build url:  curl https://api.openai.com/v1/threads/$OPENAI_THREAD/messages 
+    openai_url.append("threads/");
+    openai_url.append(mOpenAIThread);
+    openai_url.append("/messages?limit=1&order=desc&run_id=");
+    openai_url.append(mOpenAIRun);
+
+    req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, get_headers);
+
+    http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "OpenAI fetching most recent message from run returned status " << status.getStatus()
+                        << " and http_results: " << req_response << LL_ENDL;
+
+    if (status.getStatus() != 0)
+    {
+        LL_WARNS("AIChat") << "Unable to get last message from OpenAI run via " << openai_url << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    std::string ai_message;  // Dig text out of response:   data[0].content[0].text.value
+    const LLSD& chat_data = req_response.get("data");
+    if (chat_data.isArray() && chat_data.size() > 0)
+    {
+        const LLSD& chat_message_full = chat_data[0];
+        if (chat_message_full.isMap())
+        {
+            const LLSD& chat_message_content = chat_message_full.get("content");
+            if (chat_message_content.isArray() && chat_message_content.size() > 0)
+            {
+                const LLSD& content_first_reply = chat_message_content[0];
+                if (content_first_reply.isMap())        //  && content_first_reply.get("type").asString() == "text"
+                {
+                    const LLSD& first_reply_text = content_first_reply.get("text");
+                    if (first_reply_text.isMap())
+                    {   // Phew!
+                        ai_message = first_reply_text.get("value").asString();
+                    }
+                }
+            }
+        }
+    }
+
+    if (ai_message.length())
+    {
+        FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
+    }
+    else
+    {
+        LL_WARNS("AIChat") << "Unable to extract chat response from OpenAI results " << req_response << LL_ENDL;
+    }
+
+    setRequestBusy(false);
+
+    if (mNextMessage.size() > 0)
+    {  // Have another message ready to go
+        LL_INFOS("AIChat") << "Sending saved chat request to " << url << LL_ENDL;
+        std::string next_message = mNextMessage;
+        mNextMessage.clear();
+        mRequestDirect = mNextMessageDirect;
+        setRequestBusy();
+        LLCoros::instance().launch("FSAIOpenAIService::sendMessageToAICoro",
+                                   boost::bind(&FSAIOpenAIService::sendMessageToAICoro, this, url, message));
+    }
+
     return true;
 }
 
@@ -398,10 +761,10 @@ bool FSAIKindroidService::validateConfig(const LLSD& config)
     return true;
 }
 
-// getAIResponseCoro
-bool FSAIKindroidService::getAIResponseCoro(const std::string& url, const std::string& message)
+// sendMessageToAICoro
+bool FSAIKindroidService::sendMessageToAICoro(const std::string& url, const std::string& message)
 {
-    LL_INFOS("AIChat") << "getAIResponseCoro called with URL: " << url << " and message: " << message << LL_ENDL;
+    LL_INFOS("AIChat") << "sendMessageToAICoro called with URL: " << url << " and message: " << message << LL_ENDL;
     // Placeholder logic
     return true;
 }

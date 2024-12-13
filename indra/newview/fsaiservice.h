@@ -45,7 +45,9 @@ public:
     const std::string& getName() { return mName; };
 
     virtual void sendChatToAIService(const std::string& message, bool request_direct) = 0;
-    virtual void sendChatTargetChangeMessage(const std::string& previous_name, const std::string& new_name) {};
+    virtual bool okToSendChatToAIService(const std::string& message, bool request_direct);
+
+    virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) {};
 
     // Check if message should be dropped
     virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) { return false; };
@@ -78,14 +80,16 @@ class FSAINomiService : public FSAIService
     ~FSAINomiService();
 
     virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
-    virtual void sendChatTargetChangeMessage(const std::string& previous_name, const std::string& new_name) override;
+    virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
     virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) override;
 
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool getAIResponseCoro(const std::string & url, const std::string & message);
+    bool sendMessageToAICoro(const std::string & url, const std::string & message);
 };
+
+
 
 // ------------------------------------------------
 // Use local LLM via LM Studio
@@ -100,7 +104,7 @@ class FSAILMStudioService : public FSAIService
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool getAIResponseCoro(const std::string& url, const std::string& message);
+    bool sendMessageToAICoro(const std::string& url, const std::string& message);
 };
 
 
@@ -113,11 +117,15 @@ class FSAIOpenAIService : public FSAIService
     ~FSAIOpenAIService();
 
     virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
 
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool getAIResponseCoro(const std::string& url, const std::string& message);
+    bool sendMessageToAICoro(const std::string& url, const std::string& message);
+
+    std::string mOpenAIThread;          // OpenAI thread ID for conversation with assistant
+    std::string mOpenAIRun;             // OpenID run ID for a the current message
 };
 
 
@@ -134,7 +142,7 @@ class FSAIKindroidService : public FSAIService
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool getAIResponseCoro(const std::string& url, const std::string& message);
+    bool sendMessageToAICoro(const std::string& url, const std::string& message);
 };
 
 #endif

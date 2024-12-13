@@ -2549,7 +2549,7 @@ class LLAdvancedAIChat : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        LL_INFOS("AIChat") << "handleEvent called:  " << userdata << LL_ENDL;
+        LL_DEBUGS("AIChat") << "handleEvent called:  " << userdata << LL_ENDL;
         return true;
     }
 };

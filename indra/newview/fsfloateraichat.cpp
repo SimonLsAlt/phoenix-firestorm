@@ -196,10 +196,9 @@ void FSPanelAIConfiguration::onSelectAIService()
         std::string ai_service_name = cb->getValue().asString();
         LL_INFOS("AIChat") << "Selected AI service " << ai_service_name << LL_ENDL;
 
-        LLSD ai_config = LLSD::emptyMap();
-        ai_config[AI_SERVICE] = ai_service_name;
-        FSAIChatMgr::getInstance()->setAIConfig(ai_config);
+        FSAIChatMgr::getInstance()->switchAIConfig(ai_service_name);
 
+        const LLSD & ai_config = FSAIChatMgr::getInstance()->getAIConfig();
         updateUIElement(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service_name);
         updateUIElement(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service_name);
         updateUIElement(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service_name);
@@ -234,16 +233,22 @@ bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const s
 {   // This isn't elegant, but works
     if (service_name == LLM_KINDROID)
     {
+        return false;
     }
     else if (service_name == LLM_LMSTUDIO)
     {
+        return false;
     }
     else if (service_name == LLM_OPENAI)
-    {
+    {   // Use endpoint as root, characater id as assistant id.   To do - customize label to use "assistant"
+        return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
+                ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT ||
+                ui_name == AI_CHARACTER_ID_PROMPT || ui_name == AI_CHARACTER_ID);
     }
     else if (service_name == LLM_NOMI)
     {   // Character ID is embedded in the service url
-        return (ui_name != AI_CHARACTER_ID && ui_name != AI_CHARACTER_ID_PROMPT);
+        return (ui_name == AI_ENDPOINT_PROMPT || ui_name == AI_ENDPOINT ||
+                ui_name == AI_API_KEY_PROMPT || ui_name == AI_API_KEY);
     }
     return true;
 }
@@ -256,37 +261,56 @@ void FSPanelAIConfiguration::onApplyConfig()
 
     LLSD        ai_config      = LLSD::emptyMap();
 
+    // First save on/off switch
     LLCheckBoxCtrl* cbc = getChild<LLCheckBoxCtrl>(AI_CHAT_ON);
     if (cbc)
     {
         ai_config[AI_CHAT_ON] = cbc->getValue().asBoolean();
     }
 
-    LLComboBox* cb = getChild<LLComboBox>(AI_SERVICE);
-    if (cb)
-    {
-        ai_config[AI_SERVICE] = cb->getValue().asString();
-    }
+    // Save values that current service cares about
+    addInLineEditorValue(AI_ENDPOINT, ai_config);
+    addInLineEditorValue(AI_API_KEY, ai_config);
+    addInLineEditorValue(AI_CHARACTER_ID, ai_config);
 
-    LLLineEditor* le = getChild<LLLineEditor>(AI_ENDPOINT);
-    if (le)
-    {
-        std::string endpoint  = le->getValue().asString();
-        ai_config[AI_ENDPOINT] = endpoint;
-    }
-    le = getChild<LLLineEditor>(AI_API_KEY);
-    if (le)
-    {
-        ai_config[AI_API_KEY] = le->getValue().asString();
-    }
-    //le = getChild<LLLineEditor>(AI_API_KEY);
-    //if (le)   // character key is embedded in the service url
-    //{
-    //    ai_config[AI_CHARACTER_ID] = le->getValue().asString();
-    //}
-
-    FSAIChatMgr::getInstance()->setAIConfig(ai_config);
+    FSAIChatMgr::getInstance()->setAIConfigValues(ai_config);
 }
+
+
+void FSPanelAIConfiguration::addInLineEditorValue(const std::string& ui_name, LLSD& ai_config) const
+{  // If needed, get a string from a line editor and add to the config
+    LLLineEditor* le = nullptr;
+    if (useConfigValue(ui_name, ai_config[AI_SERVICE].asStringRef()))
+    {
+        le = getChild<LLLineEditor>(ui_name);
+        if (le)
+        {
+            ai_config[ui_name]   = le->getValue().asString();
+        }
+    }
+}
+
+bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, const std::string& service_name) const
+{   // return true if the give configuration name is used for the service   To do - just put this into a static map or something
+    if (service_name == LLM_KINDROID)
+    {
+        return false;
+    }
+    else if (service_name == LLM_LMSTUDIO)
+    {
+        return false;
+    }
+    else if (service_name == LLM_OPENAI)
+    {   // Use endpoint as a url root, characater id as assistant id
+        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY || config_name == AI_CHARACTER_ID);
+    }
+    else if (service_name == LLM_NOMI)
+    {   // Character ID is embedded in the service url so doesn't need AI_CHARACTER_ID
+        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY);
+    }
+    return true;
+}
+
 
 
 
@@ -402,18 +426,21 @@ void FSPanelAIConversation::onSendMsgToAgent()
 {  // Callback for pressing "Send Message" button
     LL_INFOS("AIChat") << "Conversation Send Message button pressed" << LL_ENDL;
 
+    // tbd - disable button if edit/approve checkbox is off?
+    //     - disable / prevent sending duplicates?
+
     // Get message text and send it via mgr.
     LLTextEditor* te = getChild<LLTextEditor>(UI_AI_CHAT_EDITOR);
     if (te)
     {
         const std::string& message = te->getValue().asStringRef();
-        // to do - send it
+        // to do - send IM
     }
 }
 
 
 void FSPanelAIConversation::onResetChat()
-{  // Callback for pressing "Send Message" button
+{  // Callback for pressing "Reset Chat" button
     LL_INFOS("AIChat") << "Conversation Reset Chat button pressed" << LL_ENDL;
     FSAIChatMgr::getInstance()->resetChat();
 }

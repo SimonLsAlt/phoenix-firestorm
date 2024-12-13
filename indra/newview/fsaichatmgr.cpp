@@ -57,10 +57,11 @@ FSAIChatMgr::FSAIChatMgr() : mAIService(nullptr)
 {
     // Ensure values in case there is no saved settings file
     mAIConfig = LLSD::emptyMap();
-    mAIConfig[AI_CHAT_ON]       = false;
-    mAIConfig[AI_SERVICE]       = std::string();
-    mAIConfig[AI_ENDPOINT]      = std::string();
-    mAIConfig[AI_API_KEY]   = std::string();
+    mAIConfig[AI_CHAT_ON]      = false;
+    mAIConfig[AI_SERVICE]      = std::string();
+
+    mAIConfig[AI_ENDPOINT]     = std::string();    // to do - break apart service specific config settings to live in service class
+    mAIConfig[AI_API_KEY]      = std::string();
     mAIConfig[AI_CHARACTER_ID] = std::string();
 
     mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);
@@ -73,7 +74,8 @@ FSAIChatMgr::~FSAIChatMgr()
 
 void FSAIChatMgr::startupAIChat()
 {  // Called at viewer startup time
-    loadAvatarAISettings();
+    std::string use_saved_name;
+    loadAvatarAISettings(use_saved_name);   // Use the service name saved in the config file
     if (mAIConfig[AI_CHAT_ON].asBoolean() && !mAIConfig[AI_SERVICE].asStringRef().empty())
     {
         createAIService(mAIConfig[AI_SERVICE].asStringRef());
@@ -84,18 +86,6 @@ void FSAIChatMgr::startupAIChat()
 void FSAIChatMgr::setChatSession(const LLUUID& chat_session)
 {   // to do - check for overwrite?
     mChatSession = chat_session;
-}
-
-void FSAIChatMgr::clearMatchingTargetSession(const LLUUID& closing_session)
-{   // Clear mChatSession if it matches a closing_session
-    if (mChatSession == closing_session)
-    {
-        LL_INFOS("AIChat") << "Clearing AI chat session " << mChatSession << LL_ENDL;
-        mChatSession.setNull();
-        mChattyAgent.setNull();
-
-        // to do - close conversation with AI ?
-    }
 }
 
 
@@ -121,32 +111,40 @@ LLSD FSAIChatMgr::readFullAvatarAISettings()
 }
 
 
-void FSAIChatMgr::loadAvatarAISettings()
+void FSAIChatMgr::loadAvatarAISettings(const std::string& use_service)
 {   // Loads current selected AI config into mAIConfig
     LLSD full_data = readFullAvatarAISettings();
 
     if (full_data.isMap() && full_data.size() > 1 && full_data.has(AI_SERVICE))
     {
+        std::string new_service = use_service;
+        if (new_service.length() == 0)
+        {
+            new_service = full_data[AI_SERVICE].asString();
+        }
+        LL_DEBUGS("AIChat") << "use_service is " << (use_service.length() ? use_service : "<empty>") << " and new_service will be " << new_service << LL_ENDL;
+
         mAIConfig = LLSD::emptyMap();
-        std::string cur_service = full_data[AI_SERVICE].asString();
+        mAIConfig[AI_SERVICE] = new_service;
+        mAIConfig[AI_CHAT_ON] = (full_data.has(AI_CHAT_ON) && full_data.get(AI_CHAT_ON).asBoolean());
 
         for (LLSD::map_const_iterator it = full_data.beginMap(); it != full_data.endMap(); ++it)
         {
-            if (it->first == cur_service && it->second.isMap())
+            if (it->first == new_service && it->second.isMap())
             {
                 LLSD config_data = it->second;
+                // to do - move service specific config storage into the service class
                 for (LLSD::map_const_iterator config_it = config_data.beginMap(); config_it != config_data.endMap(); ++config_it)
                 {
                     mAIConfig[config_it->first] = config_it->second;
-                    LL_INFOS("AIChat") << " setting '" << config_it->first << "' is " << config_it->second << LL_ENDL;
+                    LL_DEBUGS("AIChat") << " setting '" << config_it->first << "' is " << config_it->second.asString() << LL_ENDL;
                 }
                 break;
             }
         }
-        // to do - clean up, don't log sensitive data
-        LL_INFOS("AIChat") << "Read avatar AI configuration for " << cur_service << ": " << mAIConfig << LL_ENDL;
+        // Don't normally log sensitive data
+        LL_DEBUGS("AIChat") << "Read avatar AI configuration for " << new_service << ": " << mAIConfig << LL_ENDL;
     }
-
 }
 
 void FSAIChatMgr::saveAvatarAISettings()
@@ -166,10 +164,13 @@ void FSAIChatMgr::saveAvatarAISettings()
         full_config[service_name] = LLSD::emptyMap();
     }
 
-    // Copy all values into the config
+    // Copy service specific values into the config
     for (LLSD::map_const_iterator config_it = mAIConfig.beginMap(); config_it != mAIConfig.endMap(); ++config_it)
     {
-        full_config[service_name][config_it->first] = config_it->second;
+        if (config_it->first != AI_CHAT_ON && config_it->first != AI_SERVICE)
+        {   // to do - extend service class to maintain its own config data
+            full_config[service_name][config_it->first] = config_it->second;
+        }
     }
 
     // Save the current service name and on state
@@ -182,67 +183,95 @@ void FSAIChatMgr::saveAvatarAISettings()
     llofstream file(filename.c_str());
     if (!file.is_open())
     {
-        LL_WARNS() << "Unable to save avatar AI chat settings!" << LL_ENDL;
+        LL_WARNS() << "Unable to save avatar AI chat settings to " << filename << LL_ENDL;
         return;
     }
 
-    LL_INFOS("AIChat") << "Writing avatar AI configuration to " << filename << ": " << mAIConfig << LL_ENDL;
+    LL_DEBUGS("AIChat") << "Writing avatar AI configuration to " << filename << ": " << mAIConfig << LL_ENDL;
     LLSDSerialize::toPrettyXML(full_config, file);
     file.close();
 }
 
 
-void FSAIChatMgr::setAIConfig(LLSD& ai_config)
-{   // Select AI service to use and save configuration values
+bool FSAIChatMgr::setAIConfigValues(LLSD& ai_config)
+{   // Save configuration values for the current service name
+    bool changed = false;
 
-    LL_INFOS("AIChat") << "Setting new AI config values: " << ai_config << LL_ENDL;
-    if (ai_config.has(AI_SERVICE))
-    {
-        createAIService(ai_config[AI_SERVICE].asStringRef());
-    }
-
-    // Copy over all values passed in
+    LL_DEBUGS("AIChat") << "Setting new AI config values: " << ai_config << LL_ENDL;
     for (LLSD::map_iterator config_iter = ai_config.beginMap(); config_iter != ai_config.endMap(); ++config_iter)
-    {
-        mAIConfig[config_iter->first] = config_iter->second;
+    {   // Assign all the new values passed in
+        if ((mAIConfig[config_iter->first].asString() != config_iter->second.asString()))
+        {
+            changed = true;
+            mAIConfig[config_iter->first] = config_iter->second;
+        }
     }
-    LL_INFOS("AIChat") << "Set AI config values: " << mAIConfig << LL_ENDL;
-    saveAvatarAISettings();     // Save it to the file
+
+    std::string new_service = ai_config.get(AI_SERVICE).asString();
+    if (new_service.length() && (!mAIService || mAIService->getName() != new_service))
+    {
+        createAIService(new_service);   // Refresh service object
+        changed = true;
+    }
+
+    if (mAIConfig[AI_CHAT_ON].asBoolean() != ai_config.get(AI_CHAT_ON).asBoolean())
+    {
+        mAIConfig[AI_CHAT_ON] = ai_config.get(AI_CHAT_ON);
+        changed = true;
+    }
+
+    if (changed)
+    {
+        saveAvatarAISettings();  // Save back to file
+    }
+    else
+    {
+        LL_INFOS("AIChat") << "AI chat settings not changed, skipping saving to file" << LL_ENDL;
+    }
+    return changed;
 }
+
+
+void FSAIChatMgr::switchAIConfig(const std::string& service_name)
+{   // Switch to different service, loading those config values from file
+    loadAvatarAISettings(service_name);
+
+    LL_INFOS("AIChat") << "Switching AI to " << service_name << LL_ENDL;
+    createAIService(service_name);
+}
+
 
 void FSAIChatMgr::createAIService(const std::string& ai_service_name)
 {  // Creates service object mAIService
-    if (mAIService && mAIService->getName() != ai_service_name)
+    if (mAIService)
     {
-        LL_INFOS("AIChat") << "Deleting " << mAIService->getName() << " AI service to make new one for " << ai_service_name << LL_ENDL;
+        LL_DEBUGS("AIChat") << "Deleting " << mAIService->getName() << " AI service to make new one for " << ai_service_name << LL_ENDL;
         delete mAIService;
         mAIService = nullptr;
     }
 
-    if (!mAIService)
-    {  // Create a new one as needed
-        mAIService = FSAIService::createFSAIService(ai_service_name);
-        if (mAIService)
-        {
-            LL_INFOS("AIChat") << "Created new " << mAIService->getName() << " AI chat back end service" << LL_ENDL;
-        }
-        else
-        {  // Shouldn't ever happen, except during development when menu and support are not in sync
-            LL_WARNS("AIChat") << "Unable to create AI service for " << ai_service_name << LL_ENDL;
-        }
-
-        mAIChatHistory.clear();
+    // Create a new one
+    mAIService = FSAIService::createFSAIService(ai_service_name);
+    if (mAIService)
+    {
+        LL_INFOS("AIChat") << "Created new " << mAIService->getName() << " AI chat back end service" << LL_ENDL;
     }
+    else
+    {   // Shouldn't ever happen, except during development when menu and support are not in sync
+        LL_WARNS("AIChat") << "Unable to create AI service for " << ai_service_name << LL_ENDL;
+    }
+
+    mAIChatHistory.clear();
 }
 
 
 void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& message, const std::string& name, const LLUUID& sessionid)
 {
-    LL_INFOS("AIChat") << "Handling IM chat from " << from_id << " name " << name << ", session " << sessionid << ", text: " << message
-                       << LL_ENDL;
-
     if (mAIConfig.get(AI_CHAT_ON).asBoolean())
     {
+        LL_DEBUGS("AIChat") << "Handling IM chat from " << from_id << " name " << name << ", session " << sessionid << ", text: " << message
+                           << LL_ENDL;
+
         if (mLastChatTimer.hasExpired())
         {   // Conversation went dead, reset
             resetChat();
@@ -267,8 +296,8 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
                     LL_INFOS("AIChat") << "Name change detected was chatting with " << previous_name << ", starting chat with "
                                        << mChattyDisplayName << LL_ENDL;
                     if (previous_name != mChattyDisplayName)
-                    {  // Send message to AI about chat change
-                        mAIService->sendChatTargetChangeMessage(previous_name, new_name);
+                    {  // Service needs to adjust for change conversation target
+                        mAIService->aiChatTargetChanged(previous_name, new_name);
                     }
                 }
             }

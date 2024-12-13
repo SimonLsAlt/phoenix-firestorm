@@ -123,7 +123,8 @@ public:
 
   protected:
     void syncUIWithAISettings();
-
+    void addInLineEditorValue(const std::string& ui_name, LLSD& ai_config) const;
+    bool useConfigValue(const std::string& ui_name, const std::string& service_name) const;
 };
 
 

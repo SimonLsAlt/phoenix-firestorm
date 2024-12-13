@@ -61,12 +61,12 @@ public:
 
     void            setChatSession(const LLUUID& chat_session);
     const LLUUID&   getChatSession() const { return mChatSession; };
-    void            clearMatchingTargetSession(const LLUUID& closing_session);
 
-    void            setAIConfig(LLSD & ai_config);    // Supports some subset of config value changes
+    bool            setAIConfigValues(LLSD & ai_config);    // Supports some subset of config value changes
+    void            switchAIConfig(const std::string& service_name);        // Switch to different service, load those config values
     const LLSD&     getAIConfig() const         { return mAIConfig;  }
 
-    void            loadAvatarAISettings();
+    void            loadAvatarAISettings(const std::string & use_service);
     void            saveAvatarAISettings();
 
     // Setting mChattyAgent happens when new session is set up
@@ -96,9 +96,10 @@ public:
     LLUUID          mChatSession;        // Chat session id
     LLUUID          mChattyAgent;        // Other agent
     std::string     mChattyDisplayName;  // Name of other agent to use in conversation
-    FSAIService*    mAIService;          // Interface to external AI chat service
-    LLSD            mAIConfig;           // Configuration values for AI back end
-    LLFrameTimer      mLastChatTimer;     // Track time so we can drop dead chat sessions
+
+    FSAIService*      mAIService;        // Interface to external AI chat service
+    LLSD              mAIConfig;         // Configuration values for AI back end
+    LLFrameTimer      mLastChatTimer;    // Track time so we can drop dead chat sessions
     ai_chat_history_t mAIChatHistory;    // Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
 };
 #endif
