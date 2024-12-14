@@ -52,6 +52,9 @@ public:
     // Check if message should be dropped
     virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) { return false; };
 
+    // Save in history?
+    virtual bool saveChatHistory() const { return false; };
+
     // Flag indicating a request is processing
     void setRequestBusy(bool busy = true) { mRequestBusy = busy; };
     bool getRequestBusy() const           { return mRequestBusy; };
@@ -123,7 +126,9 @@ class FSAIOpenAIService : public FSAIService
     virtual bool validateConfig(const LLSD& config) override;
 
     bool sendMessageToAICoro(const std::string& url, const std::string& message);
+    bool addAssistantInstructions(LLSD& body);
 
+    std::string mAssistantInstructions; // Value fetched from openAI
     std::string mOpenAIThread;          // OpenAI thread ID for conversation with assistant
     std::string mOpenAIRun;             // OpenID run ID for a the current message
 };

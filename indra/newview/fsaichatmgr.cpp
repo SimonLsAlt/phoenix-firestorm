@@ -262,6 +262,11 @@ void FSAIChatMgr::createAIService(const std::string& ai_service_name)
     }
 
     mAIChatHistory.clear();
+
+    while (!mAIReplyQueue.empty())
+    {
+        mAIReplyQueue.pop();
+    }
 }
 
 
@@ -327,8 +332,11 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
             {   // Send message to external AI chat service
                 LL_INFOS("AIChat") << "Sending chat from avatar to " << mAIService->getName() << " AI service" << LL_ENDL;
                 mAIService->sendChatToAIService(message, false);
-                mAIChatHistory.push_front(std::string("SL:").append(message));
-                trimAIChatHistoryData();
+                if (mAIService->saveChatHistory())
+                {
+                    mAIChatHistory.push_front(std::string("SL:").append(message));
+                    trimAIChatHistoryData();
+                }
             }
             else
             {
@@ -391,8 +399,26 @@ void FSAIChatMgr::resetChat()
 }
 
 
+void FSAIChatMgr::idle()
+{   // Handle any incoming messages from the AI that have been saved for main thread processing
+    while (!mAIReplyQueue.empty())
+    {
+        std::pair<std::string, bool> ai_message = mAIReplyQueue.front();
+        mAIReplyQueue.pop();  // Remove from the front
+        finallyProcessIncomingAIResponse(ai_message.first, ai_message.second);
+    }
+}
+
 void FSAIChatMgr::processIncomingAIResponse(const std::string& ai_message, bool request_direct)
-{
+{   // Just save message data - called from coroutine
+    mAIReplyQueue.push({ ai_message, request_direct });  // Push on the back - enforce some size limit / warning?
+}
+
+
+void FSAIChatMgr::finallyProcessIncomingAIResponse(const std::string& ai_message, bool request_direct)
+{   // to do - can't do UI stuff from the coro, or it may get an assert.   Buffer responses
+    // and add an idle() call from the main loop to handle reponses
+    llassert(LLCoros::on_main_thread_main_coro());
     FSFloaterAIChat* floater = FSFloaterAIChat::getAIChatFloater();
     if (floater)
     {
@@ -433,10 +459,15 @@ void FSAIChatMgr::processIncomingAIResponse(const std::string& ai_message, bool 
         // Send it!
         LLIMModel::sendMessage(ai_message, mChatSession, mChattyAgent, IM_NOTHING_SPECIAL);
 
-        mAIChatHistory.push_front(std::string("AI:").append(ai_message));
-        trimAIChatHistoryData();
+        if (mAIService->saveChatHistory())
+        {
+            mAIChatHistory.push_front(std::string("AI:").append(ai_message));
+            trimAIChatHistoryData();
+        }
     }
 }
+
+
 
 void FSAIChatMgr::trimAIChatHistoryData()
 {  // Limit size of mAIChatHistory

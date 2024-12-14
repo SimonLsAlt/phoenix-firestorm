@@ -75,6 +75,8 @@ public:
     const std::string& getChattyDisplayName() const                  { return mChattyDisplayName; };
     void               setChattyDisplayName(const std::string& name) { mChattyDisplayName = name; };
 
+    void            idle();     // Regularly called from main loop
+
     void            processIncomingChat(const LLUUID& from_id,
                                         const std::string& message,
                                         const std::string& name,
@@ -92,6 +94,7 @@ public:
     LLSD            readFullAvatarAISettings();  // Reads the full file possibly with multiple configurations
     void            createAIService(const std::string& ai_service_name);  // Creates service object mAIService
     void            trimAIChatHistoryData();      // Limit history storage
+    void            finallyProcessIncomingAIResponse(const std::string& ai_message, bool request_direct);       // Deferred actual processing
 
     LLUUID          mChatSession;        // Chat session id
     LLUUID          mChattyAgent;        // Other agent
@@ -101,5 +104,8 @@ public:
     LLSD              mAIConfig;         // Configuration values for AI back end
     LLFrameTimer      mLastChatTimer;    // Track time so we can drop dead chat sessions
     ai_chat_history_t mAIChatHistory;    // Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
+
+    // Reply data from the AI request coroutine - cached for processing in the main loop
+    std::queue<std::pair<std::string, bool>> mAIReplyQueue;        // Has message and "direct" flag
 };
 #endif

@@ -268,6 +268,8 @@ using namespace LL;
 
 #include "growlmanager.h"
 #include "fsavatarrenderpersistence.h"
+#include "fsaichatmgr.h"
+
 
 // *FIX: These extern globals should be cleaned up.
 // The globals either represent state/config/resource-storage of either
@@ -5641,6 +5643,10 @@ void LLAppViewer::idle()
         idleNameCache();
         idleNetwork();
 
+        // </FS:simonlsalt>
+        // Handle incoming replies from back-end AI
+        FSAIChatMgr::getInstance()->idle();
+        // </FS:simonlsalt>
 
         // Check for away from keyboard, kick idle agents.
         // be sane and only check for afk 1nce

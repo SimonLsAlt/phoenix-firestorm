@@ -496,7 +496,52 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& url, const std::s
     //    "metadata": {}
     //}
 
-    // Step 3 :  create a run
+    // Step 3:  get assistant instructions if we don't have it already
+    if (mAssistantInstructions.empty())
+    {
+        openai_url = base_url;  // build url: //api.openai.com/v1/assistants/$OPENAI_ASST_ID
+        openai_url.append("assistants/");
+        openai_url.append(getAIConfig().get(AI_CHARACTER_ID));
+
+        req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, post_headers);
+        http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+        status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+        LL_DEBUGS("AIChat") << "OpenAI getting assistant info returned " << status.getStatus() << " and req_response: " << req_response
+                            << LL_ENDL;
+
+        if (status.getStatus() != 0)
+        {
+            LL_WARNS("AIChat") << "Unable to get OpenAI assistant from " << openai_url << " and id " << getAIConfig().get(AI_CHARACTER_ID)
+                               << ", fix configuration settings?" << LL_ENDL;
+            setRequestBusy(false);
+            return false;
+        }
+
+        //{  results
+        //  "id" : "asst_3sSIOJIb3PnQTENXne5jD8t4",
+        //  "object" : "assistant",
+        //  "created_at" : 1733793284,
+        //  "name" : "MrHap",
+        //  "description" : null,
+        //  "model" : "gpt-4o-mini",
+        //  "instructions" : "You are a creative and intelligent AI <lots more>",
+        //  "tools" : [],
+        //  "top_p" : 1.0,
+        //  "temperature" : 1.0,
+        //  "tool_resources" : {},
+        //  "metadata" : {},
+        //  "response_format" : "auto"
+        //  }
+
+        mAssistantInstructions = req_response.get("instructions").asString();
+        if (mAssistantInstructions.empty())
+        {   // Ensure there is something
+            mAssistantInstructions = "You are a helpful and friendly AI assistant";
+        }
+    }
+
+    // Step 4 :  create a run
 
     openai_url = base_url;  // build url:  api.openai.com/v1/threads/$OPENAI_THREAD/runs
     openai_url.append("threads/");
@@ -505,7 +550,8 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& url, const std::s
 
     body = LLSD::emptyMap();
     body["assistant_id"] = getAIConfig().get(AI_CHARACTER_ID);
-    // body["max_tokens"] = 100;
+    addAssistantInstructions(body);
+
     req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, post_headers);
     http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
@@ -562,7 +608,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& url, const std::s
     mOpenAIRun = req_response.get("id").asString();
     LL_DEBUGS("AIChat") << "OpenAI run set to " << mOpenAIRun << LL_ENDL;
 
-    // Step 4 : check and wait for run to complete
+    // Step 5 : check and wait for run to complete
 
     openai_url = base_url;  // build url:  https://api.openai.com/v1/threads/$OPENAI_THREAD/runs/$OPENAI_RUN_ID
     openai_url.append("threads/");
@@ -660,7 +706,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& url, const std::s
         }
     }   // End loop sleeping and checking run status
 
-    // Step 5 : get the most recent message
+    // Step 6 : get the most recent message
 
     openai_url = base_url;  // build url:  curl https://api.openai.com/v1/threads/$OPENAI_THREAD/messages 
     openai_url.append("threads/");
@@ -730,6 +776,40 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& url, const std::s
 
     return true;
 }
+
+
+// Called from coroutine
+bool FSAIOpenAIService::addAssistantInstructions(LLSD& body)
+{   // Add "instructions" if needed
+    static S32 reply_size = 0;
+
+    bool added = false;
+    if (reply_size != 0)
+    {
+        std::string extra;
+        switch (reply_size)
+        {
+            case 2:
+                extra = "If appropriate, give a medium reponse of a few sentences.";
+                break;
+            case 3:
+                extra = "If appropriate, give a reponse with a few small paragraphs.";
+                break;
+            case 1:
+            default:
+                extra = "Give a short reponse.";
+                break;
+        }
+
+        LL_DEBUGS("AIChat") << "Adding extra instructions: " << extra << LL_ENDL;
+        extra.append("\n");
+        body["instructions"] = extra.append(mAssistantInstructions);
+        added = true;
+    }
+
+    return added;
+}
+
 
 
 // ------------------------------------------------
