@@ -64,13 +64,12 @@ public:
 
 protected:
 
-    bool        mRequestBusy;  // Flag that a request is running the coroutine
-    bool        mRequestDirect;  // Flag that a request is direct to LLM, not from avatar chat (to do - make a type?)
-    std::string mName;         // Name of this AI service
+    bool        mRequestBusy;   // Flag that a request is running the coroutine
+    bool        mRequestDirect; // Flag that a request is direct to LLM, not from avatar chat (to do - make a type?)
+    std::string mName;          // Name of this AI service
 
-    // super-simple 1 message queue so we can send a directive before a user chat message
-    std::string mNextMessage;
-    bool        mNextMessageDirect;
+    // Outgoing to AI message queue
+    std::queue<std::pair<std::string, bool>> mAIOutboxQueue;  // Contains message and "direct" flag
 };
 
 
@@ -89,7 +88,7 @@ class FSAINomiService : public FSAIService
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool sendMessageToAICoro(const std::string & url, const std::string & message);
+    bool sendMessageToAICoro(const std::string & message);
 };
 
 
@@ -107,7 +106,7 @@ class FSAILMStudioService : public FSAIService
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool sendMessageToAICoro(const std::string& url, const std::string& message);
+    bool sendMessageToAICoro(const std::string& message);
 };
 
 
@@ -125,7 +124,7 @@ class FSAIOpenAIService : public FSAIService
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool sendMessageToAICoro(const std::string& url, const std::string& message);
+    bool sendMessageToAICoro(const std::string& message);
     bool addAssistantInstructions(LLSD& body);
 
     std::string mAssistantInstructions; // Value fetched from openAI
@@ -147,7 +146,7 @@ class FSAIKindroidService : public FSAIService
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool sendMessageToAICoro(const std::string& url, const std::string& message);
+    bool sendMessageToAICoro(const std::string& message);
 };
 
 #endif

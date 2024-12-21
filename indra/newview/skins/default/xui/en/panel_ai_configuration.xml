@@ -46,7 +46,7 @@
      visible="true"
      width="120">
         <combo_box.item
-         label="Kindroid.ai (future)"
+         label="Kindroid.ai"
          name="Kindroid.ai"
          value="Kindroid.ai" />
         <combo_box.item

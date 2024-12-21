@@ -233,7 +233,9 @@ bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const s
 {   // This isn't elegant, but works
     if (service_name == LLM_KINDROID)
     {
-        return false;
+        return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
+                ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT ||
+                ui_name == AI_CHARACTER_ID_PROMPT || ui_name == AI_CHARACTER_ID);
     }
     else if (service_name == LLM_LMSTUDIO)
     {
@@ -294,14 +296,14 @@ bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, cons
 {   // return true if the give configuration name is used for the service   To do - just put this into a static map or something
     if (service_name == LLM_KINDROID)
     {
-        return false;
+        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY || config_name == AI_CHARACTER_ID);
     }
     else if (service_name == LLM_LMSTUDIO)
     {
         return false;
     }
     else if (service_name == LLM_OPENAI)
-    {   // Use endpoint as a url root, characater id as assistant id
+    {   // Needs all 3 basics
         return (config_name == AI_ENDPOINT || config_name == AI_API_KEY || config_name == AI_CHARACTER_ID);
     }
     else if (service_name == LLM_NOMI)

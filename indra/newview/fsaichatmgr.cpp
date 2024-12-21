@@ -51,6 +51,8 @@ inline constexpr char AVATAR_AI_SETTINGS_FILENAME[] = "avatar_ai_settings.xml ";
 
 static constexpr F32 AI_CHAT_AFK_GIVEUP_SECS = (60 * 15);       // 15 minutes
 
+static constexpr S32 AI_REPLY_QUEUE_LIMIT = 10;
+
 // ----------------------------------------------------------------------------------------
 
 FSAIChatMgr::FSAIChatMgr() : mAIService(nullptr)
@@ -411,7 +413,15 @@ void FSAIChatMgr::idle()
 
 void FSAIChatMgr::processIncomingAIResponse(const std::string& ai_message, bool request_direct)
 {   // Just save message data - called from coroutine
-    mAIReplyQueue.push({ ai_message, request_direct });  // Push on the back - enforce some size limit / warning?
+    if (mAIReplyQueue.size() < AI_REPLY_QUEUE_LIMIT)
+    {
+        mAIReplyQueue.push({ ai_message, request_direct });  // Push on the back.
+    }
+    else
+    {
+        LL_WARNS("AIChat") << "AI message reply queue is full with " << mAIReplyQueue.size() << ", dropping message: " << ai_message
+                           << LL_ENDL;
+    }
 }
 
 
