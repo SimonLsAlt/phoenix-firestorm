@@ -58,7 +58,7 @@
          name="OpenAI"
          value="OpenAI" />
         <combo_box.item
-         label="LM Studio (future)"
+         label="LM Studio"
          name="LMStudio"
          value="LMStudio" />
     </combo_box>

@@ -239,7 +239,8 @@ bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const s
     }
     else if (service_name == LLM_LMSTUDIO)
     {
-        return false;
+        return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
+                ui_name == AI_CHARACTER_ID_PROMPT || ui_name == AI_CHARACTER_ID);
     }
     else if (service_name == LLM_OPENAI)
     {   // Use endpoint as root, characater id as assistant id.   To do - customize label to use "assistant"
@@ -300,7 +301,7 @@ bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, cons
     }
     else if (service_name == LLM_LMSTUDIO)
     {
-        return false;
+        return (config_name == AI_ENDPOINT || config_name == AI_CHARACTER_ID);
     }
     else if (service_name == LLM_OPENAI)
     {   // Needs all 3 basics

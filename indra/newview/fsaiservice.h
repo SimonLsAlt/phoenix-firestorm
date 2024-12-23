@@ -59,8 +59,13 @@ public:
     void setRequestBusy(bool busy = true) { mRequestBusy = busy; };
     bool getRequestBusy() const           { return mRequestBusy; };
 
+    // Utilities
+    std::string getBaseUrl() const;
+    LLCore::HttpHeaders::ptr_t createHeaders(bool add_bearer = true);
+
     // Use this factory to create the correct service object
     static FSAIService * createFSAIService(const std::string& service_name);
+
 
 protected:
 
@@ -142,11 +147,13 @@ class FSAIKindroidService : public FSAIService
     ~FSAIKindroidService();
 
     virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
 
   protected:
     virtual bool validateConfig(const LLSD& config) override;
 
     bool sendMessageToAICoro(const std::string& message);
+    bool sendChatResetToAICoro();
 };
 
 #endif
