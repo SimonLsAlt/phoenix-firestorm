@@ -140,7 +140,7 @@ bool FSPanelAIInfo::postBuild()
     return true;  // Assuming success for placeholder
 }
 
-void FSPanelAIInfo::updateUIElement(const std::string& lineEditorName, const std::string& textBoxName,
+void FSPanelAIInfo::updatePromptAndTextEditor(const std::string& lineEditorName, const std::string& textBoxName,
                                     const LLSD& ai_config, const std::string & ai_service)
 {
     LLLineEditor* le = getChild<LLLineEditor>(lineEditorName);
@@ -198,10 +198,10 @@ void FSPanelAIConfiguration::onSelectAIService()
 
         FSAIChatMgr::getInstance()->switchAIConfig(ai_service_name);
 
-        const LLSD & ai_config = FSAIChatMgr::getInstance()->getAIConfig();
-        updateUIElement(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service_name);
-        updateUIElement(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service_name);
-        updateUIElement(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service_name);
+        const LLSD& ai_config = FSAIChatMgr::getInstance()->getAIConfig();
+        updatePromptAndTextEditor(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service_name);
+        updatePromptAndTextEditor(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service_name);
+        updatePromptAndTextEditor(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service_name);
     }
 }
 
@@ -223,9 +223,9 @@ void FSPanelAIConfiguration::syncUIWithAISettings()
     {
         cb->setValue(ai_service_name);
     }
-    updateUIElement(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service_name);
-    updateUIElement(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service_name);
-    updateUIElement(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service_name);
+    updatePromptAndTextEditor(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service_name);
+    updatePromptAndTextEditor(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service_name);
+    updatePromptAndTextEditor(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service_name);
 }
 
 

@@ -390,20 +390,22 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
 
     // Build the message
     LLSD body = LLSD::emptyMap();
-    body["model"] = "{{model}}";            // to do - is this needed?
-    body["char"] = getAIConfig().get(AI_CHARACTER_ID).asString();
-    body["temperature"] = 0.7;              // to do - use a config value
-    body["max_tokens"] = 1000;              // to do - use a config value
-    body["max_completion_tokens"] = 200;    // to do - use a config value
     body["stream"] = "false";
+    // Values like "char", "model", "temperature", "max_tokens", "max_completion_tokens"
+    //  aren't exposed in the Firestorm UI since they are available in LM Studio
+    //
+    // body["char"] = getAIConfig().get(AI_CHARACTER_ID).asString();
+    // body["model"] = "{{model}}";
+    // body["temperature"] = 0.7;              // to do - use a config value
+    // body["max_tokens"] = 1000;              // to do - use a config value
+    // body["max_completion_tokens"] = 200;    // to do - use a config value
 
     LLSD messages = LLSD::emptyArray();
     LLSD one_message = LLSD::emptyMap();
     one_message["role"] = "user";
     one_message["content"] = message;
-    messages.append(one_message);
-
-    body["messages"] = messages;
+    messages.append(one_message);   // TBD future - possibly add system messages here?
+    body["messages"] = messages;    // Use the model's context window for chat history
 
     LLSD req_response   = http_adapter->postJsonAndSuspend(http_request, url, body,
                                                            http_options, headers);
@@ -420,7 +422,7 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     }
 
     // {
-    //  "id": "chatcmpl-w4bj6skgky4vg694uxy8k",
+    //  "id": "chatcmpl-w4bj61234567890uxy8k",
     //  "object": "chat.completion",
     //  "created": 1734914704,
     //  "model": "llama-3.1-8b-lexi-uncensored-v2",
@@ -429,16 +431,16 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     //      "index": 0,
     //      "message": {
     //        "role": "assistant",
-    //        "content": "My name is ... <snipped>"
+    //        "content": "My name is ... <snipped long reply>"
     //      },
     //      "logprobs": null,
     //      "finish_reason": "stop"
     //    }
     //  ],
     //  "usage": {
-    //    "prompt_tokens": 362,
-    //    "completion_tokens": 152,
-    //    "total_tokens": 514
+    //    "prompt_tokens": 362,    * Experiments:
+    //    "completion_tokens": 152,  * compare these numbers
+    //    "total_tokens": 514        * with limits set in LM Studio
     //  },
     //  "system_fingerprint": "llama-3.1-8b-lexi-uncensored-v2"
     //}
@@ -446,7 +448,7 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     std::string ai_message;
     const LLSD& choices = req_response.get("choices");
     if (choices.isArray() && choices.size() > 0)
-    {
+    {   // Dig into results for the reply text
         const LLSD& chat_message_full = choices[0];
         if (chat_message_full.isMap())
         {

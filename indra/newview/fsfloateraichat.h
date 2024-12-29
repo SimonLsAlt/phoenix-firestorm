@@ -101,7 +101,7 @@ public:
     virtual void resetChat() {};
 
   protected:
-    void updateUIElement(const std::string& lineEditorName, const std::string& textBoxName,
+    void updatePromptAndTextEditor(const std::string& lineEditorName, const std::string& textBoxName,
                          const LLSD& ai_config, const std::string& ai_service);
 };
 
