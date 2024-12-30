@@ -45,6 +45,7 @@ inline constexpr char AI_APPLY_BTN[] = "apply_btn";
 inline constexpr char AI_SERVICE[]   = "service";
 
 // Names of supported AI back-ends, must match up with panel_ai_configuration.xml combo box values
+inline constexpr char LLM_GEMINI[]   = "Gemini";
 inline constexpr char LLM_KINDROID[] = "Kindroid.ai";
 inline constexpr char LLM_LMSTUDIO[] = "LMStudio";
 inline constexpr char LLM_OPENAI[]   = "OpenAI";

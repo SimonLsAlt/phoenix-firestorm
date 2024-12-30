@@ -68,7 +68,11 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
 {
 	// Based on the name, create the proper service class handler
     FSAIService* ai_service = nullptr;
-    if (service_name == LLM_KINDROID)
+    if (service_name == LLM_GEMINI)
+    {
+        ai_service = dynamic_cast<FSAIService*>(new FSAIGeminiService(service_name));
+    }
+    else if (service_name == LLM_KINDROID)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAIKindroidService(service_name));
     }
@@ -76,13 +80,13 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAILMStudioService(service_name));
     }
-    else if (service_name == LLM_OPENAI)
-    {
-        ai_service = dynamic_cast<FSAIService*>(new FSAIOpenAIService(service_name));
-    }
     else if (service_name == LLM_NOMI)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAINomiService(service_name));
+    }
+    else if (service_name == LLM_OPENAI)
+    {
+        ai_service = dynamic_cast<FSAIService*>(new FSAIOpenAIService(service_name));
     }
 
 
@@ -130,29 +134,348 @@ bool FSAIService::okToSendChatToAIService(const std::string& message, bool reque
     return true;
 }
 
-std::string FSAIService::getBaseUrl() const
+std::string FSAIService::getBaseUrl(bool add_delimiter /* = false */) const
 {
     std::string base_url = getAIConfig().get(AI_ENDPOINT);
-    if (!boost::ends_with(base_url, "/"))
+    if (add_delimiter && !boost::ends_with(base_url, "/"))
     {
         base_url.append("/");
     }
     return base_url;
 }
 
-LLCore::HttpHeaders::ptr_t FSAIService::createHeaders(bool add_bearer)
+LLCore::HttpHeaders::ptr_t FSAIService::createHeaders(bool add_authorization /* = true */)
 {  // Some common code - several services use the same headers
     LLCore::HttpHeaders::ptr_t headers     = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
-    std::string                auth_header = getAIConfig().get(AI_API_KEY).asString();
-    if (add_bearer && !boost::starts_with(auth_header, "Bearer "))
-    {   // Kindroid wants "Authorization: Bearer <api key>"
-        auth_header = std::string("Bearer ").append(auth_header);
-    }
-    headers->append(HTTP_OUT_HEADER_AUTHORIZATION, auth_header);
     headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_JSON);
+    if (add_authorization)
+    {
+        std::string auth_header = getAIConfig().get(AI_API_KEY).asString();
+        if (!boost::starts_with(auth_header, "Bearer "))
+        {   // Some require "Authorization: Bearer <api key>" format, others don't care
+            auth_header = std::string("Bearer ").append(auth_header);
+        }
+        headers->append(HTTP_OUT_HEADER_AUTHORIZATION, auth_header);
+    }
     return headers;
 }
 
+
+// ------------------------------------------------
+// Use chat via Gemini
+FSAIGeminiService::FSAIGeminiService(const std::string& name) : FSAIService(name)
+{
+    LL_INFOS("AIChat") << "created FSAIGeminiService" << LL_ENDL;
+};
+
+FSAIGeminiService::~FSAIGeminiService()
+{
+    LL_INFOS("AIChat") << "deleting FSAIGeminiService" << LL_ENDL;
+};
+
+// Called with new config values, getAIConfig() still contains old values
+bool FSAIGeminiService::validateConfig(const LLSD& config)
+{
+    // to do - sanity check config values
+    return true;
+};
+
+void FSAIGeminiService::sendChatToAIService(const std::string& message, bool request_direct)
+{ // Send message to the AI service
+    if (!okToSendChatToAIService(message, request_direct))
+    {
+        return;
+    }
+
+    LL_DEBUGS("AIChat") << "sendChat called with message: " << message << LL_ENDL;
+    mRequestDirect = request_direct;
+
+    setRequestBusy();
+    LLCoros::instance().launch("FSAIGeminiService::sendMessageToAICoro",
+                               boost::bind(&FSAIGeminiService::sendMessageToAICoro, this, message));
+}
+
+bool FSAIGeminiService::sendMessageToAICoro(const std::string& message)
+{
+    // $ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+    //        -H 'Content-Type: application/json'  \
+    //        -X POST  \
+    //        -d '{ "contents" : [
+    //              { "parts": [
+    //                    { "text": "What is your name?." }
+    //                         ]
+    //              }
+    //                           ]
+    //            } '
+
+    // Expect "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash" as the base url
+    //   add ":generateContent?key=$GEMINI_API_KEY"  as a suffix
+
+    std::string url = getBaseUrl(false).append(":generateContent?key=");
+    url.append(getAIConfig().get(AI_API_KEY).asString());
+
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro using URL: " << url << " and message: " << message << LL_ENDL;
+
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
+    http_options->setTimeout(AI_REQUEST_TIMEOUT);
+
+    LLCore::HttpHeaders::ptr_t headers = createHeaders(false);  // don't need Authorization
+
+    // Build the message
+    LLSD body = LLSD::emptyMap();
+    body["contents"] = LLSD::emptyArray();
+    body["contents"].append(LLSD::emptyMap());
+    body["contents"][0]["parts"] = LLSD::emptyArray();
+    body["contents"][0]["parts"].append(LLSD::emptyMap());
+    body["contents"][0]["parts"][0]["text"] = message;
+
+    // TBD - what other values to support
+    // Model selection can be done via the base url
+
+    LLSD               req_response = http_adapter->postJsonAndSuspend(http_request, url, body, http_options, headers);
+    LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro returned status " << status.getStatus() << " and http_results: " << http_results
+                        << ", req_response: " << req_response << LL_ENDL;
+    if (status.getStatus() != 0)
+    {
+        LL_WARNS("AIChat") << "Error status from Gemini chat request:  " << http_results << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    // req_response: {
+    //    "candidates": [{
+    //        "content": { "parts": [{ "text": "I don't have a name. I am a large language model.\n" }], "role": "model" },
+    //        "finishReason": "STOP",
+    //        "avgLogprobs": -0.080485060811042786
+    //    }],
+    //    "usageMetadata": { "promptTokenCount": 5, "candidatesTokenCount": 16, "totalTokenCount": 21 },
+    //    "modelVersion": "gemini-1.5-flash"
+    // }
+
+    std::string ai_message;
+    const LLSD& candidates = req_response.get("candidates");
+    if (candidates.isArray() && candidates.size() > 0)
+    { // Dig into results for the reply text
+        const LLSD& first_candidate = candidates[0];
+        if (first_candidate.isMap())
+        {
+            const LLSD& content = first_candidate.get("content");
+            if (content.isMap())
+            {
+                const LLSD& content_parts = content.get("parts");
+                if (content_parts.isArray() && content_parts.size() > 0)
+                {
+                    const LLSD& first_part = content_parts[0];
+                    if (first_part.isMap())
+                    {   // Yay!
+                        ai_message = first_part.get("text").asString();
+                    }
+                }
+            }
+        }
+    }
+
+    if (ai_message.length())
+    {
+        FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
+    }
+    else
+    {
+        LL_WARNS("AIChat") << "Failed to get message from Gemini chat response:  " << http_results << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    setRequestBusy(false);
+    return true;
+}
+
+
+// ------------------------------------------------
+// Use Kindroid chat
+FSAIKindroidService::FSAIKindroidService(const std::string& name) : FSAIService(name)
+{ // Call base class constructor
+    LL_INFOS("AIChat") << "FSAIKindroidService created with name: " << name << LL_ENDL;
+}
+
+// Destructor
+FSAIKindroidService::~FSAIKindroidService()
+{
+    LL_INFOS("AIChat") << "FSAIKindroidService destroyed" << LL_ENDL;
+}
+
+// Called with new config values before they are stored
+bool FSAIKindroidService::validateConfig(const LLSD& config)
+{
+    LL_INFOS("AIChat") << "To do - Kindroid sanity check for config: " << config << LL_ENDL;
+    return true;
+};
+
+void FSAIKindroidService::sendChatToAIService(const std::string& message, bool request_direct)
+{ // Send message to the AI service
+    if (!okToSendChatToAIService(message, request_direct))
+    {
+        return;
+    }
+
+    mRequestDirect = request_direct;
+
+    // Send message via coroutine
+    LL_DEBUGS("AIChat") << "Sending " << (mRequestDirect ? "direct" : "regular") << " AI chat request to " << getName() << ": " << message
+                        << LL_ENDL;
+    setRequestBusy();
+    LLCoros::instance().launch("FSAIKindroidService::sendMessageToAICoro",
+                               boost::bind(&FSAIKindroidService::sendMessageToAICoro, this, message));
+}
+
+// sendMessageToAICoro
+bool FSAIKindroidService::sendMessageToAICoro(const std::string& message)
+{
+    // curl - X POST -vvv https://api.kindroid.ai/v1/send-message \
+    // -H "Authorization: Bearer $KINDROID_API_KEY" \
+    // -H "Content-Type: application/json" \
+    // -d "{
+    //  \"ai_id\": \"$KINDROID_AI_ID\",
+    //  \"message\": \"Did you get this?  I'm trying to talk via a curl command\"
+    //}
+    //"
+    std::string url = getBaseUrl().append("send-message");
+
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro starting with URL: " << url << " and message: " << message << LL_ENDL;
+
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
+    http_options->setTimeout(AI_REQUEST_TIMEOUT);
+
+    LLCore::HttpHeaders::ptr_t headers = createHeaders();
+
+    // This is really ugly, but Kindoid's API seems to accept json and return raw text :(
+    // Using a "accept: application/json" doesn't help either, it always sends raw text back
+    // headers->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_JSON);
+    LLSD body       = LLSD::emptyMap();
+    body["ai_id"]   = getAIConfig().get(AI_CHARACTER_ID);
+    body["message"] = message;
+
+    LLCore::BufferArray::ptr_t rawbody(new LLCore::BufferArray);
+    { // It would be trivial to construct this by hand, but do the right thing with code from HttpCoroutineAdapter::postJsonAndSuspend()
+        LLCore::BufferArrayStream outs(rawbody.get());
+        std::string               value = boost::json::serialize(LlsdToJson(body));
+        outs << value; // Put value into rawbody
+    }
+
+    // Can't use postJsonAndSuspend() because the result then fails to parse the raw text returned
+    // LLSD req_response   = http_adapter->postJsonAndSuspend(http_request, url, body, http_options, headers);
+    LLSD req_response = http_adapter->postRawAndSuspend(http_request, url, rawbody, http_options, headers);
+
+    LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro returned status " << status.getStatus() << " and http_results: " << http_results
+                        << ", req_response: " << req_response << LL_ENDL;
+
+    if (status.getStatus() == 0)
+    {
+        const std::vector<U8>& raw_b16    = req_response.get("raw").asBinary();
+        std::string            ai_message = std::string((char*)raw_b16.data(), raw_b16.size());
+        LL_DEBUGS("AIChat") << "AI response:  " << ai_message << LL_ENDL;
+
+        if (ai_message.length())
+        {
+            FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
+        }
+        else
+        {
+            LL_WARNS("AIChat") << "Unexpected empty response from Kindroid chat AI:  " << http_results << LL_ENDL;
+            setRequestBusy(false);
+            return false;
+        }
+    }
+    else
+    {
+        LL_WARNS("AIChat") << "Error status from AI service request:  " << http_results << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    setRequestBusy(false);
+
+    return true;
+}
+
+void FSAIKindroidService::aiChatTargetChanged(const std::string& previous_name, const std::string& new_name)
+{ // Caller should ensure there is a name change and new_name is not empty
+
+    if (!okToSendChatToAIService("dummy string", false))
+    { // If something is totally wonky, don't send it
+        return;
+    }
+
+    mRequestDirect = true;
+
+    // Send request to the /chat-break endpoint
+    LL_DEBUGS("AIChat") << "Sending /chat-break reset to Kindroid" << LL_ENDL;
+    setRequestBusy();
+    LLCoros::instance().launch("FSAIKindroidService::sendChatResetToAICoro",
+                               boost::bind(&FSAIKindroidService::sendChatResetToAICoro, this));
+}
+
+bool FSAIKindroidService::sendChatResetToAICoro()
+{
+    // Chat break
+    //        Ends a chat and resets the short term memory.Greeting is mandatory& is the first message in a new conversation.
+    // curl - X POST -vvv https://api.kindroid.ai/v1/chat-break \
+    // -H "Authorization: Bearer $KINDROID_API_KEY" \
+    // -H "Content-Type: application/json" \
+    // -d "{
+    //  \"ai_id\": \"$KINDROID_AI_ID\",
+    //  \"greeting\": \"Hello there\"
+    //}
+    //"
+    std::string url = getBaseUrl().append("chat-break");
+
+    LL_INFOS("AIChat") << "sendChatResetToAICoro starting with URL: " << url << LL_ENDL;
+
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
+    http_options->setTimeout(AI_REQUEST_TIMEOUT);
+
+    LLCore::HttpHeaders::ptr_t headers = createHeaders();
+
+    // This is really ugly, but Kindoid's API seems to accept json and return raw text :(
+    // Using a "accept: application/json" doesn't help either, it always sends raw text back
+    // headers->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_JSON);
+    LLSD body        = LLSD::emptyMap();
+    body["ai_id"]    = getAIConfig().get(AI_CHARACTER_ID);
+    body["greeting"] = "Hello there"; // to so - experiment with this
+
+    LLSD req_response = http_adapter->postJsonAndSuspend(http_request, url, body, http_options, headers);
+
+    LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "sendChatResetToAICoro returned status " << status.getStatus() << " and req_response: " << req_response
+                        << LL_ENDL;
+
+    if (status.getStatus() != 0)
+    {
+        LL_WARNS("AIChat") << "Error status from /chat-reset Kindroid request:  " << http_results << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    setRequestBusy(false);
+    return true;
+}
 
 
 // ------------------------------------------------
@@ -234,12 +557,14 @@ bool FSAINomiService::sendMessageToAICoro(const std::string& message)
     LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
     LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
+    http_options->setTimeout(AI_REQUEST_TIMEOUT);
 
     LLCore::HttpHeaders::ptr_t headers = createHeaders(true);
 	LLSD body = LLSD::emptyMap();
     body["messageText"] = message;
 
-    LLSD req_response = http_adapter->postJsonAndSuspend(http_request, url, body, headers);
+    LLSD req_response = http_adapter->postJsonAndSuspend(http_request, url, body, http_options, headers);
 
     LLSD    http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
@@ -377,7 +702,7 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
 
     std::string url = getBaseUrl().append("chat/completions");
 
-    LL_INFOS("AIChat") << "sendMessageToAICoro starting with URL: " << url << " and message: " << message << LL_ENDL;
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro starting with URL: " << url << " and message: " << message << LL_ENDL;
 
     LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
@@ -385,27 +710,24 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     LLCore::HttpOptions::ptr_t http_options(new LLCore::HttpOptions);
     http_options->setTimeout(AI_REQUEST_TIMEOUT);
 
-    LLCore::HttpHeaders::ptr_t headers = createHeaders();
-    headers->remove(HTTP_OUT_HEADER_AUTHORIZATION);     // don't need Authorization
+    LLCore::HttpHeaders::ptr_t headers = createHeaders(false);   // don't need Authorization
 
     // Build the message
     LLSD body = LLSD::emptyMap();
-    body["stream"] = "false";
+    body["messages"] = LLSD::emptyArray();      // Use LM Studio's context window for chat history
+    body["messages"].append(LLSD::emptyMap());
+    body["messages"][0]["role"] = "user";
+    body["messages"][0]["content"] = message;   // TBD future - add system messages here?
+    body["stream"]   = "false";
+
     // Values like "char", "model", "temperature", "max_tokens", "max_completion_tokens"
-    //  aren't exposed in the Firestorm UI since they are available in LM Studio
+    //  aren't exposed in the Firestorm UI but are available in LM Studio
     //
     // body["char"] = getAIConfig().get(AI_CHARACTER_ID).asString();
     // body["model"] = "{{model}}";
     // body["temperature"] = 0.7;              // to do - use a config value
     // body["max_tokens"] = 1000;              // to do - use a config value
     // body["max_completion_tokens"] = 200;    // to do - use a config value
-
-    LLSD messages = LLSD::emptyArray();
-    LLSD one_message = LLSD::emptyMap();
-    one_message["role"] = "user";
-    one_message["content"] = message;
-    messages.append(one_message);   // TBD future - possibly add system messages here?
-    body["messages"] = messages;    // Use the model's context window for chat history
 
     LLSD req_response   = http_adapter->postJsonAndSuspend(http_request, url, body,
                                                            http_options, headers);
@@ -542,6 +864,8 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& message)
     LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
     LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
+    http_options->setTimeout(AI_REQUEST_TIMEOUT);
 
     // Headers used for most of the POST operations
     LLCore::HttpHeaders::ptr_t headers = createHeaders(true);
@@ -559,7 +883,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& message)
     {
         openai_url = base_url;
         openai_url.append("threads");
-        req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, headers);
+        req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, http_options, headers);
 
         http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
         status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
@@ -590,7 +914,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& message)
     body["role"] = "user";
     body["content"] = message;
 
-    req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, headers);
+    req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, http_options, headers);
     http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
 
@@ -623,7 +947,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& message)
         openai_url.append("assistants/");
         openai_url.append(getAIConfig().get(AI_CHARACTER_ID));
 
-        req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, headers);
+        req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, http_options, headers);
         http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
         status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
 
@@ -672,7 +996,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& message)
     body["assistant_id"] = getAIConfig().get(AI_CHARACTER_ID);
     addAssistantInstructions(body);
 
-    req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, headers);
+    req_response = http_adapter->postJsonAndSuspend(http_request, openai_url, body, http_options, headers);
     http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
 
@@ -748,7 +1072,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& message)
         llcoro::suspendUntilTimeout(SECS_BETWEEN_REQUESTS);
 
         ai_wait_req_count++;
-        req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, headers);
+        req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, http_options, headers);
         http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
         status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
 
@@ -834,7 +1158,7 @@ bool FSAIOpenAIService::sendMessageToAICoro(const std::string& message)
     openai_url.append("/messages?limit=1&order=desc&run_id=");
     openai_url.append(mOpenAIRun);
 
-    req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, headers);
+    req_response = http_adapter->getJsonAndSuspend(http_request, openai_url, http_options, headers);
 
     http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
@@ -932,180 +1256,3 @@ bool FSAIOpenAIService::addAssistantInstructions(LLSD& body)
 
 
 
-// ------------------------------------------------
-// Use Kindroid chat
-FSAIKindroidService::FSAIKindroidService(const std::string& name) : FSAIService(name)
-{  // Call base class constructor
-    LL_INFOS("AIChat") << "FSAIKindroidService created with name: " << name << LL_ENDL;
-}
-
-// Destructor
-FSAIKindroidService::~FSAIKindroidService()
-{
-	LL_INFOS("AIChat") << "FSAIKindroidService destroyed" << LL_ENDL;
-}
-
-// Called with new config values before they are stored
-bool FSAIKindroidService::validateConfig(const LLSD& config)
-{
-    LL_INFOS("AIChat") << "To do - Kindroid sanity check for config: " << config << LL_ENDL;
-    return true;
-};
-
-void FSAIKindroidService::sendChatToAIService(const std::string& message, bool request_direct)
-{  // Send message to the AI service
-    if (!okToSendChatToAIService(message, request_direct))
-    {
-        return;
-    }
-
-    mRequestDirect = request_direct;
-
-    // Send message via coroutine
-    LL_DEBUGS("AIChat") << "Sending " << (mRequestDirect ? "direct" : "regular") << " AI chat request to " << getName() << ": " << message
-                        << LL_ENDL;
-    setRequestBusy();
-    LLCoros::instance().launch("FSAIKindroidService::sendMessageToAICoro",
-                               boost::bind(&FSAIKindroidService::sendMessageToAICoro, this, message));
-}
-
-// sendMessageToAICoro
-bool FSAIKindroidService::sendMessageToAICoro(const std::string& message)
-{
-    // curl - X POST -vvv https://api.kindroid.ai/v1/send-message \
-    // -H "Authorization: Bearer $KINDROID_API_KEY" \
-    // -H "Content-Type: application/json" \
-    // -d "{
-    //  \"ai_id\": \"$KINDROID_AI_ID\",
-    //  \"message\": \"Did you get this?  I'm trying to talk via a curl command\"
-    //}
-    //"
-    std::string url = getBaseUrl().append("send-message");
-
-    LL_INFOS("AIChat") << "sendMessageToAICoro starting with URL: " << url << " and message: " << message << LL_ENDL;
-
-    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
-    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
-
-    LLCore::HttpHeaders::ptr_t headers     = createHeaders();
-
-    // This is really ugly, but Kindoid's API seems to accept json and return raw text :(
-    // Using a "accept: application/json" doesn't help either, it always sends raw text back
-    // headers->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_JSON);
-    LLSD body           = LLSD::emptyMap();
-    body["ai_id"]       = getAIConfig().get(AI_CHARACTER_ID);
-    body["message"]     = message;
-
-    LLCore::BufferArray::ptr_t rawbody(new LLCore::BufferArray);
-    {   // It would be trivial to construct this by hand, but do the right thing with code from HttpCoroutineAdapter::postJsonAndSuspend()
-        LLCore::BufferArrayStream outs(rawbody.get());
-        std::string value = boost::json::serialize(LlsdToJson(body));
-        outs << value;  // Put value into rawbody
-    }
-
-    // Can't use postJsonAndSuspend() because the result then fails to parse the raw text returned
-    // LLSD req_response   = http_adapter->postJsonAndSuspend(http_request, url, body, headers);
-    LLSD req_response = http_adapter->postRawAndSuspend(http_request, url, rawbody, headers);
-
-    LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
-    LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
-
-    LL_DEBUGS("AIChat") << "sendMessageToAICoro returned status " << status.getStatus() << " and http_results: " << http_results
-                        << ", req_response: " << req_response << LL_ENDL;
-
-    if (status.getStatus() == 0)
-    {
-        const std::vector<U8>& raw_b16 = req_response.get("raw").asBinary();
-        std::string            ai_message = std::string((char*) raw_b16.data(), raw_b16.size());
-        LL_DEBUGS("AIChat") << "AI response:  " << ai_message << LL_ENDL;
-
-        if (ai_message.length())
-        {
-            FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
-        }
-        else
-        {
-            LL_WARNS("AIChat") << "Unexpected empty response from Kindroid chat AI:  " << http_results << LL_ENDL;
-            setRequestBusy(false);
-            return false;
-        }
-    }
-    else
-    {
-        LL_WARNS("AIChat") << "Error status from AI service request:  " << http_results << LL_ENDL;
-        setRequestBusy(false);
-        return false;
-    }
-
-    setRequestBusy(false);
-
-    return true;
-
-
-}
-
-void FSAIKindroidService::aiChatTargetChanged(const std::string& previous_name, const std::string& new_name)
-{  // Caller should ensure there is a name change and new_name is not empty
-
-    if (!okToSendChatToAIService("dummy string", false))
-    {   // If something is totally wonky, don't send it
-        return;
-    }
-
-    mRequestDirect = true;
-
-    // Send request to the /chat-break endpoint
-    LL_DEBUGS("AIChat") << "Sending /chat-break reset to Kindroid" << LL_ENDL;
-    setRequestBusy();
-    LLCoros::instance().launch("FSAIKindroidService::sendChatResetToAICoro",
-                               boost::bind(&FSAIKindroidService::sendChatResetToAICoro, this));
-}
-
-
-bool FSAIKindroidService::sendChatResetToAICoro()
-{
-    // Chat break
-    //        Ends a chat and resets the short term memory.Greeting is mandatory& is the first message in a new conversation.
-    // curl - X POST -vvv https://api.kindroid.ai/v1/chat-break \
-    // -H "Authorization: Bearer $KINDROID_API_KEY" \
-    // -H "Content-Type: application/json" \
-    // -d "{
-    //  \"ai_id\": \"$KINDROID_AI_ID\",
-    //  \"greeting\": \"Hello there\"
-    //}
-    //"
-    std::string url = getBaseUrl().append("chat-break");
-
-    LL_INFOS("AIChat") << "sendChatResetToAICoro starting with URL: " << url << LL_ENDL;
-
-    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
-    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
-
-    LLCore::HttpHeaders::ptr_t headers = createHeaders();
-
-    // This is really ugly, but Kindoid's API seems to accept json and return raw text :(
-    // Using a "accept: application/json" doesn't help either, it always sends raw text back
-    // headers->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_JSON);
-    LLSD body       = LLSD::emptyMap();
-    body["ai_id"]   = getAIConfig().get(AI_CHARACTER_ID);
-    body["greeting"] = "Hello there";       // to so - experiment with this
-
-    LLSD req_response   = http_adapter->postJsonAndSuspend(http_request, url, body, headers);
-
-    LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
-    LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
-
-    LL_DEBUGS("AIChat") << "sendChatResetToAICoro returned status " << status.getStatus() << " and req_response: " << req_response << LL_ENDL;
-
-    if (status.getStatus() != 0)
-    {
-        LL_WARNS("AIChat") << "Error status from /chat-reset Kindroid request:  " << http_results << LL_ENDL;
-        setRequestBusy(false);
-        return false;
-    }
-
-    setRequestBusy(false);
-    return true;
-}

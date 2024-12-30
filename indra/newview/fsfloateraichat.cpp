@@ -231,28 +231,35 @@ void FSPanelAIConfiguration::syncUIWithAISettings()
 
 bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const std::string& service_name) const
 {   // This isn't elegant, but works
+    if (service_name == LLM_GEMINI)
+    {
+        return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
+                ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT);
+    }
     if (service_name == LLM_KINDROID)
     {
         return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
                 ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT ||
                 ui_name == AI_CHARACTER_ID_PROMPT || ui_name == AI_CHARACTER_ID);
     }
-    else if (service_name == LLM_LMSTUDIO)
+    if (service_name == LLM_LMSTUDIO)
     {
         return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
                 ui_name == AI_CHARACTER_ID_PROMPT || ui_name == AI_CHARACTER_ID);
     }
-    else if (service_name == LLM_OPENAI)
+    if (service_name == LLM_NOMI)
+    {   // Character ID is embedded in the service url
+        return (ui_name == AI_ENDPOINT_PROMPT || ui_name == AI_ENDPOINT ||
+                ui_name == AI_API_KEY_PROMPT || ui_name == AI_API_KEY);
+    }
+    if (service_name == LLM_OPENAI)
     {   // Use endpoint as root, characater id as assistant id.   To do - customize label to use "assistant"
         return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
                 ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT ||
                 ui_name == AI_CHARACTER_ID_PROMPT || ui_name == AI_CHARACTER_ID);
     }
-    else if (service_name == LLM_NOMI)
-    {   // Character ID is embedded in the service url
-        return (ui_name == AI_ENDPOINT_PROMPT || ui_name == AI_ENDPOINT ||
-                ui_name == AI_API_KEY_PROMPT || ui_name == AI_API_KEY);
-    }
+
+    LL_WARNS("AIChat") << "Unknown LLM " << service_name << " in enableUIElement()" << LL_ENDL;
     return true;
 }
 
@@ -295,22 +302,28 @@ void FSPanelAIConfiguration::addInLineEditorValue(const std::string& ui_name, LL
 
 bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, const std::string& service_name) const
 {   // return true if the give configuration name is used for the service   To do - just put this into a static map or something
+    if (service_name == LLM_GEMINI)
+    {
+        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY);
+    }
     if (service_name == LLM_KINDROID)
     {
         return (config_name == AI_ENDPOINT || config_name == AI_API_KEY || config_name == AI_CHARACTER_ID);
     }
-    else if (service_name == LLM_LMSTUDIO)
+    if (service_name == LLM_LMSTUDIO)
     {
         return (config_name == AI_ENDPOINT || config_name == AI_CHARACTER_ID);
     }
-    else if (service_name == LLM_OPENAI)
+    if (service_name == LLM_NOMI)
+    { // Character ID is embedded in the service url so doesn't need AI_CHARACTER_ID
+        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY);
+    }
+    if (service_name == LLM_OPENAI)
     {   // Needs all 3 basics
         return (config_name == AI_ENDPOINT || config_name == AI_API_KEY || config_name == AI_CHARACTER_ID);
     }
-    else if (service_name == LLM_NOMI)
-    {   // Character ID is embedded in the service url so doesn't need AI_CHARACTER_ID
-        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY);
-    }
+
+    LL_WARNS("AIChat") << "Unknown LLM " << service_name << " in useConfigValue()" << LL_ENDL;
     return true;
 }
 

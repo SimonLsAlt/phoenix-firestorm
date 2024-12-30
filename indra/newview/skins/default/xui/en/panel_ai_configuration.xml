@@ -46,9 +46,17 @@
      visible="true"
      width="120">
         <combo_box.item
+         label="Gemini"
+         name="Gemini"
+         value="Gemini" />
+        <combo_box.item
          label="Kindroid.ai"
          name="Kindroid.ai"
          value="Kindroid.ai" />
+        <combo_box.item
+         label="LM Studio"
+         name="LMStudio"
+         value="LMStudio" />
         <combo_box.item
          label="Nomi.ai"
          name="Nomi.ai"
@@ -57,10 +65,6 @@
          label="OpenAI"
          name="OpenAI"
          value="OpenAI" />
-        <combo_box.item
-         label="LM Studio"
-         name="LMStudio"
-         value="LMStudio" />
     </combo_box>
 
     <view_border

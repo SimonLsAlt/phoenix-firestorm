@@ -60,7 +60,7 @@ public:
     bool getRequestBusy() const           { return mRequestBusy; };
 
     // Utilities
-    std::string getBaseUrl() const;
+    std::string getBaseUrl(bool add_delimiter = false) const;
     LLCore::HttpHeaders::ptr_t createHeaders(bool add_bearer = true);
 
     // Use this factory to create the correct service object
@@ -77,29 +77,46 @@ protected:
     std::queue<std::pair<std::string, bool>> mAIOutboxQueue;  // Contains message and "direct" flag
 };
 
+// ------------------------------------------------
+// Use chat via Gemini
+class FSAIGeminiService : public FSAIService
+{
+public:
+    FSAIGeminiService(const std::string& name);
+    ~FSAIGeminiService();
+
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    //virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
+
+protected:
+    virtual bool validateConfig(const LLSD& config) override;
+
+    bool sendMessageToAICoro(const std::string& message);
+    //bool sendChatResetToAICoro();
+};
 
 // ------------------------------------------------
-// Use nomi.ai
-class FSAINomiService : public FSAIService
+// Use chat via Kindroid
+class FSAIKindroidService : public FSAIService
 {
-  public:
-    FSAINomiService(const std::string& name);
-    ~FSAINomiService();
+public:
+    FSAIKindroidService(const std::string& name);
+    ~FSAIKindroidService();
 
     virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
     virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
-    virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) override;
 
-  protected:
+protected:
     virtual bool validateConfig(const LLSD& config) override;
 
-    bool sendMessageToAICoro(const std::string & message);
+    bool sendMessageToAICoro(const std::string& message);
+    bool sendChatResetToAICoro();
 };
 
 
 
 // ------------------------------------------------
-// Use local LLM via LM Studio
+// Use chat via local LLM in LM Studio
 class FSAILMStudioService : public FSAIService
 {
   public:
@@ -116,7 +133,25 @@ class FSAILMStudioService : public FSAIService
 
 
 // ------------------------------------------------
-// Use local LLM via OpenAI
+// Use chat via Nomi.ai
+class FSAINomiService : public FSAIService
+{
+public:
+    FSAINomiService(const std::string& name);
+    ~FSAINomiService();
+
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
+    virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) override;
+
+protected:
+    virtual bool validateConfig(const LLSD& config) override;
+
+    bool sendMessageToAICoro(const std::string& message);
+};
+
+// ------------------------------------------------
+// Use chat via OpenAI
 class FSAIOpenAIService : public FSAIService
 {
   public:
@@ -135,25 +170,6 @@ class FSAIOpenAIService : public FSAIService
     std::string mAssistantInstructions; // Value fetched from openAI
     std::string mOpenAIThread;          // OpenAI thread ID for conversation with assistant
     std::string mOpenAIRun;             // OpenID run ID for a the current message
-};
-
-
-// ------------------------------------------------
-// Use local LLM via Kindroid
-class FSAIKindroidService : public FSAIService
-{
-  public:
-    FSAIKindroidService(const std::string& name);
-    ~FSAIKindroidService();
-
-    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
-    virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
-
-  protected:
-    virtual bool validateConfig(const LLSD& config) override;
-
-    bool sendMessageToAICoro(const std::string& message);
-    bool sendChatResetToAICoro();
 };
 
 #endif
