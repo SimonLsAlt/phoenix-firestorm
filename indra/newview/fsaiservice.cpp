@@ -42,7 +42,10 @@ static constexpr S32 MAX_AI_OUTBOX_QUEUE = 10;
 // Seconds timeout for AI requests - needs some time to think
 static constexpr U32 AI_REQUEST_TIMEOUT = 90;
 
- // ---------------------------------------------------------
+// Boundary for FORM data
+const std::string FORM_BOUNDARY = "----fsAiChatIsTalKingToConVai";
+
+// ---------------------------------------------------------
 // base class FSAIService
 
 FSAIService::FSAIService(const std::string& name) : mRequestBusy(false),
@@ -68,7 +71,11 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
 {
 	// Based on the name, create the proper service class handler
     FSAIService* ai_service = nullptr;
-    if (service_name == LLM_GEMINI)
+    if (service_name == LLM_CONVAI)
+    {
+        ai_service = dynamic_cast<FSAIService*>(new FSAIConvaiService(service_name));
+    }
+    else if (service_name == LLM_GEMINI)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAIGeminiService(service_name));
     }
@@ -88,9 +95,6 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAIOpenAIService(service_name));
     }
-
-
-    // else ... add other supported back-ends here
 
     return ai_service;
 };
@@ -147,6 +151,7 @@ std::string FSAIService::getBaseUrl(bool add_delimiter /* = false */) const
 LLCore::HttpHeaders::ptr_t FSAIService::createHeaders(bool add_authorization /* = true */)
 {  // Some common code - several services use the same headers
     LLCore::HttpHeaders::ptr_t headers     = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
+
     headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_JSON);
     if (add_authorization)
     {
@@ -159,6 +164,192 @@ LLCore::HttpHeaders::ptr_t FSAIService::createHeaders(bool add_authorization /* 
     }
     return headers;
 }
+
+
+// ------------------------------------------------
+// Use Convai.ai
+
+inline constexpr char CONVAI_NO_SESSION[] = "-1";
+
+FSAIConvaiService::FSAIConvaiService(const std::string& name) : FSAIService(name)
+{
+    mChatSessionID = CONVAI_NO_SESSION;
+    LL_DEBUGS("AIChat") << "created FSAIConvaiService" << LL_ENDL;
+};
+
+FSAIConvaiService::~FSAIConvaiService()
+{
+    LL_DEBUGS("AIChat") << "deleting FSAIConvaiService" << LL_ENDL;
+};
+
+// Called with new config values before they are stored
+bool FSAIConvaiService::validateConfig(const LLSD& config)
+{
+    LL_INFOS("AIChat") << "To do - Convai sanity check for config: " << config << LL_ENDL;
+    return true;
+};
+
+void FSAIConvaiService::sendChatToAIService(const std::string& message, bool request_direct)
+{ // Send message to the AI service
+    if (!okToSendChatToAIService(message, request_direct))
+    {
+        return;
+    }
+
+    mRequestDirect = request_direct;
+
+    setRequestBusy();
+    LLCoros::instance().launch("FSAIConvaiService::sendMessageToAICoro", boost::bind(&FSAIConvaiService::sendMessageToAICoro, this, message));
+}
+
+bool FSAIConvaiService::sendMessageToAICoro(const std::string& message)
+{   // Send message via coroutine
+    std::string url = getAIConfig().get(AI_ENDPOINT);
+
+    LL_DEBUGS("AIChat") << "Sending " << (mRequestDirect ? "direct" : "regular") << " AI chat request to " << url << ": " << message
+                        << LL_ENDL;
+
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
+    http_options->setTimeout(AI_REQUEST_TIMEOUT);
+
+    // Convai is different enough using a FORM POST that createHeaders() isn't useful
+    LLCore::HttpHeaders::ptr_t headers = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
+    headers->append("CONVAI-API-KEY", getAIConfig().get(AI_API_KEY).asString());        // add 'CONVAI-API-KEY: <api key>
+    std::string form_boundary_header = "multipart/form-data; boundary=" + FORM_BOUNDARY;
+    headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, form_boundary_header.c_str());
+
+    // This is really ugly, but SL doesn't have routines for building FORM posts.  Would be a good
+    // project someday - see the other code that also builds the body manually
+
+    //=> Send data, 530 bytes (0x212)
+    //0000: --------------------------uZ7QT73XQV4ebOlxwXwdFk
+    //0032: Content-Disposition: form-data; name="userText"
+    //0063:
+    //0065: What is your name ?
+    //007a: --------------------------uZ7QT73XQV4ebOlxwXwdFk
+    //00ac: Content-Disposition: form-data; name="charID"
+    //00db:
+    //00dd: 434f4e76-c79a-1234-5432-424242424242
+    //0103: --------------------------uZ7QT73XQV4ebOlxwXwdFk
+    //0135: Content-Disposition: form-data; name="sessionID"
+    //0167:
+    //0169: -1
+    //016d: --------------------------uZ7QT73XQV4ebOlxwXwdFk
+    //019f: Content-Disposition: form-data; name="voiceResponse"con
+    //01d5:
+    //01d7: False
+    //01de: --------------------------uZ7QT73XQV4ebOlxwXwdFk--
+
+    LLCore::BufferArray::ptr_t rawbody(new LLCore::BufferArray);
+    LLCore::BufferArrayStream  post_stream(rawbody.get());
+    post_stream << "--" << FORM_BOUNDARY << "\r\n";
+
+    std::string content_disposition("Content-Disposition: form-data; name=\"");
+    post_stream << content_disposition << "userText\"\r\n\r\n";
+    post_stream << message << "\r\n";
+    post_stream << "--" << FORM_BOUNDARY << "\r\n";
+
+    post_stream << content_disposition << "charID\"\r\n\r\n";
+    post_stream << getAIConfig().get(AI_CHARACTER_ID).asString() << "\r\n";
+    post_stream << "--" << FORM_BOUNDARY << "\r\n";
+
+    post_stream << content_disposition << "sessionID\"\r\n\r\n";
+    post_stream << mChatSessionID << "\r\n";
+    post_stream << "--" << FORM_BOUNDARY << "\r\n";
+
+    post_stream << content_disposition << "voiceResponse\"\r\n\r\n";
+    post_stream << "False\r\n";
+    post_stream << "--" << FORM_BOUNDARY << "--\r\n";   // Last one needs '--'
+
+    // See llerror.h - log body if debugging is enabled
+    LL_DEBUGS("AIChat");
+    size_t post_size    = rawbody->size();
+    char*  post_buf     = new char[post_size + 1];
+    size_t read_size    = rawbody->read(0, post_buf, post_size);
+    post_buf[read_size] = 0;
+    std::string ugly(post_buf);
+    delete[] post_buf;
+    LL_CONT << "Convai POST data:\n" << ugly;
+    LL_ENDL;
+
+    // Send form POST data
+    LLSD req_response = http_adapter->postRawAndSuspend(http_request, url, rawbody, http_options, headers);
+
+    LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro returned status " << status.getStatus() << " and http_results: " << http_results
+                        << ", req_response: " << req_response << LL_ENDL;
+
+    if (status.getStatus() == 0)
+    {
+        const std::vector<U8>& raw_b16    = req_response.get("raw").asBinary();
+        std::string            convai_response = std::string((char*)raw_b16.data(), raw_b16.size());
+        LL_DEBUGS("AIChat") << "AI response:  " << convai_response << LL_ENDL;
+
+        if (convai_response.length())
+        {   // {"sessionID": "b5f417b18d130d6526a68e738585dd22"
+            //  "text": "Hey there! I'm MrFriendly. Nice to meet you!",
+            //  "response": "Hey there! I'm MrFriendly. Nice to meet you!"}
+            LLSD response_llsd;
+            boost::system::error_code ec;
+            boost::json::value jsonRoot = boost::json::parse(convai_response, ec);
+            if (!ec.failed())
+            {
+                // Convert the JSON structure to LLSD
+                response_llsd = LlsdFromJson(jsonRoot);
+                std::string convai_chat = response_llsd.get("text");    // same as "response" ?
+                if (convai_chat.length())
+                {
+                    if (mChatSessionID == CONVAI_NO_SESSION || mChatSessionID.empty())
+                    {   // Save session ID if this is the first response
+                        mChatSessionID = response_llsd.get("sessionID").asString();
+                    }
+                    FSAIChatMgr::getInstance()->processIncomingAIResponse(convai_chat, mRequestDirect);
+                }
+                else
+                {
+                    LL_WARNS("AIChat") << "Unexpected missing 'response' in Convai reply:  " << convai_response << LL_ENDL;
+                    setRequestBusy(false);
+                    return false;
+                }
+            }
+            else
+            {
+                LL_WARNS("AIChat") << "Json parse failed for Convai reply:  " << convai_response << LL_ENDL;
+                setRequestBusy(false);
+                return false;
+            }
+        }
+        else
+        {
+            LL_WARNS("AIChat") << "Unexpected empty response from Convai chat AI:  " << http_results << LL_ENDL;
+            setRequestBusy(false);
+            return false;
+        }
+    }
+    else
+    {
+        LL_WARNS("AIChat") << "Error status from AI service request:  " << http_results << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    setRequestBusy(false);
+
+    return true;
+}
+
+
+void FSAIConvaiService::aiChatTargetChanged(const std::string& previous_name, const std::string& new_name)
+{   // Clear the session ID
+    mChatSessionID = CONVAI_NO_SESSION;
+}
+
+
 
 
 // ------------------------------------------------

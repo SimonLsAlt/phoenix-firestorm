@@ -231,6 +231,12 @@ void FSPanelAIConfiguration::syncUIWithAISettings()
 
 bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const std::string& service_name) const
 {   // This isn't elegant, but works
+    if (service_name == LLM_CONVAI)
+    {
+        return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
+                ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT ||
+                ui_name == AI_CHARACTER_ID_PROMPT || ui_name == AI_CHARACTER_ID);
+    }
     if (service_name == LLM_GEMINI)
     {
         return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
@@ -302,6 +308,10 @@ void FSPanelAIConfiguration::addInLineEditorValue(const std::string& ui_name, LL
 
 bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, const std::string& service_name) const
 {   // return true if the give configuration name is used for the service   To do - just put this into a static map or something
+    if (service_name == LLM_CONVAI)
+    {
+        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY || config_name == AI_CHARACTER_ID);
+    }
     if (service_name == LLM_GEMINI)
     {
         return (config_name == AI_ENDPOINT || config_name == AI_API_KEY);

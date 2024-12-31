@@ -78,6 +78,26 @@ protected:
 };
 
 // ------------------------------------------------
+// Use chat via Convai
+class FSAIConvaiService : public FSAIService
+{
+public:
+    FSAIConvaiService(const std::string& name);
+    ~FSAIConvaiService();
+
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) override;
+
+protected:
+    virtual bool validateConfig(const LLSD& config) override;
+
+    bool sendMessageToAICoro(const std::string& message);
+
+    std::string mChatSessionID;
+};
+
+
+// ------------------------------------------------
 // Use chat via Gemini
 class FSAIGeminiService : public FSAIService
 {

@@ -46,6 +46,10 @@
      visible="true"
      width="120">
         <combo_box.item
+         label="Convai"
+         name="Convai"
+         value="Convai" />
+        <combo_box.item
          label="Gemini"
          name="Gemini"
          value="Gemini" />

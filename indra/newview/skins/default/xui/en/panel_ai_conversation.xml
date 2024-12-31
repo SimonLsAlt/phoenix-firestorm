@@ -58,7 +58,6 @@
      layout="topleft"
      left="10"
      word_wrap="true"
-     border="true"
      name="ai_chat_messages"
      width="465">
         No chat message recieved yet
@@ -97,7 +96,6 @@
      max_length="1024"
      name="ai_chat_editor"
      width="465"
-     border="true"
      word_wrap="true">
         No reply from chat system yet
     </text_editor>

@@ -49,7 +49,7 @@
 // Name of config file saved in each av folder
 inline constexpr char AVATAR_AI_SETTINGS_FILENAME[] = "avatar_ai_settings.xml ";
 
-static constexpr F32 AI_CHAT_AFK_GIVEUP_SECS = (60 * 15);       // 15 minutes
+static constexpr F32 AI_CHAT_AFK_GIVEUP_SECS = (60 * 5);   // idle time to abandon a conversation
 
 static constexpr S32 AI_REPLY_QUEUE_LIMIT = 10;
 
@@ -279,8 +279,8 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
         LL_DEBUGS("AIChat") << "Handling IM chat from " << from_id << " name " << name << ", session " << sessionid << ", text: " << message
                            << LL_ENDL;
 
-        if (mLastChatTimer.hasExpired())
-        {   // Conversation went dead, reset
+        if (mLastChatTimer.hasExpired() && mChatSession.notNull() && (mChatSession != sessionid))
+        {   // Conversation went dead, reset for new incoming chat
             resetChat();
         }
         if (mChatSession.isNull() && mAIService)
