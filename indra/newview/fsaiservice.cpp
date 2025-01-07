@@ -91,6 +91,10 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAINomiService(service_name));
     }
+    else if (service_name == LLM_OLLAMA)
+    {
+        ai_service = dynamic_cast<FSAIService*>(new FSAIOllamaService(service_name));
+    }
     else if (service_name == LLM_OPENAI)
     {
         ai_service = dynamic_cast<FSAIService*>(new FSAIOpenAIService(service_name));
@@ -399,10 +403,12 @@ bool FSAIGeminiService::sendMessageToAICoro(const std::string& message)
     //                           ]
     //            } '
 
-    // Expect "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash" as the base url
-    //   add ":generateContent?key=$GEMINI_API_KEY"  as a suffix
+    // Expect "https://generativelanguage.googleapis.com/v1beta/models/" as the base url
+    //   add model like "gemini-1.5-flash" plus ":generateContent?key=$GEMINI_API_KEY"  as a suffix
 
-    std::string url = getBaseUrl(false).append(":generateContent?key=");
+    std::string url = getBaseUrl(true);
+    url.append(getAIConfig().get(AI_MODEL).asString());
+    url.append(":generateContent?key=");
     url.append(getAIConfig().get(AI_API_KEY).asString());
 
     LL_DEBUGS("AIChat") << "sendMessageToAICoro using URL: " << url << " and message: " << message << LL_ENDL;
@@ -670,6 +676,153 @@ bool FSAIKindroidService::sendChatResetToAICoro()
 
 
 // ------------------------------------------------
+// Use local LLM via LM Studio
+FSAILMStudioService::FSAILMStudioService(const std::string& name) : FSAIService(name)
+{
+    LL_INFOS("AIChat") << "created FSAILMStudioService" << LL_ENDL;
+};
+
+FSAILMStudioService::~FSAILMStudioService()
+{
+    LL_INFOS("AIChat") << "deleting FSAILMStudioService" << LL_ENDL;
+};
+
+// Called with new config values, getAIConfig() still contains old values
+bool FSAILMStudioService::validateConfig(const LLSD& config)
+{
+    // to do - sanity check config values
+    return true;
+};
+
+void FSAILMStudioService::sendChatToAIService(const std::string& message, bool request_direct)
+{ // Send message to the AI service
+    if (!okToSendChatToAIService(message, request_direct))
+    {
+        return;
+    }
+
+    LL_DEBUGS("AIChat") << "sendChat called with message: " << message << LL_ENDL;
+    mRequestDirect = request_direct;
+
+    setRequestBusy();
+    LLCoros::instance().launch("FSAILMStudioService::sendMessageToAICoro",
+                               boost::bind(&FSAILMStudioService::sendMessageToAICoro, this, message));
+}
+
+bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
+{
+    // curl http://localhost:1234/v1/chat/completions \
+    //   -H "Content-Type: application/json" \
+    //   --max-time 180 \
+    //   -d '{ "model" : "{{model}}",
+    //        "char" : "FriendlyBot",
+    //        "messages" : [{ "role": "user", "content": "What is your name?" }],
+    //        "temperature" : 0.7,
+    //        "max_tokens" : 1000,
+    //        "max_completion_tokens" : 200,
+    //        "stream" : "false"
+    //      }'
+
+    // Expect "http://localhost:1234/v1/" as the base url
+
+    std::string url = getBaseUrl().append("chat/completions");
+
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro starting with URL: " << url << " and message: " << message << LL_ENDL;
+
+    LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
+    LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
+    http_options->setTimeout(AI_REQUEST_TIMEOUT);
+
+    LLCore::HttpHeaders::ptr_t headers = createHeaders(false); // don't need Authorization
+
+    // Build the message
+    LLSD body        = LLSD::emptyMap();
+    body["messages"] = LLSD::emptyArray(); // Use LM Studio's context window for chat history
+    body["messages"].append(LLSD::emptyMap());
+    body["messages"][0]["role"]    = "user";
+    body["messages"][0]["content"] = message; // TBD future - add system messages here?
+    body["stream"]                 = "false";
+
+    // Values like "char", "model", "temperature", "max_tokens", "max_completion_tokens"
+    //  aren't exposed in the Firestorm UI but are available in LM Studio
+    //
+    // body["char"] = getAIConfig().get(AI_CHARACTER_ID).asString();
+    // body["model"] = "{{model}}";
+    // body["temperature"] = 0.7;              // to do - use a config value
+    // body["max_tokens"] = 1000;              // to do - use a config value
+    // body["max_completion_tokens"] = 200;    // to do - use a config value
+
+    LLSD               req_response = http_adapter->postJsonAndSuspend(http_request, url, body, http_options, headers);
+    LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
+
+    LL_DEBUGS("AIChat") << "sendMessageToAICoro returned status " << status.getStatus() << " and http_results: " << http_results
+                        << ", req_response: " << req_response << LL_ENDL;
+    if (status.getStatus() != 0)
+    {
+        LL_WARNS("AIChat") << "Error status from LM Studio chat request:  " << http_results << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    // {
+    //  "id": "chatcmpl-w4bj61234567890uxy8k",
+    //  "object": "chat.completion",
+    //  "created": 1734914704,
+    //  "model": "llama-3.1-8b-lexi-uncensored-v2",
+    //  "choices": [
+    //    {
+    //      "index": 0,
+    //      "message": {
+    //        "role": "assistant",
+    //        "content": "My name is ... <snipped long reply>"
+    //      },
+    //      "logprobs": null,
+    //      "finish_reason": "stop"
+    //    }
+    //  ],
+    //  "usage": {
+    //    "prompt_tokens": 362,    * Experiments:
+    //    "completion_tokens": 152,  * compare these numbers
+    //    "total_tokens": 514        * with limits set in LM Studio
+    //  },
+    //  "system_fingerprint": "llama-3.1-8b-lexi-uncensored-v2"
+    //}
+
+    std::string ai_message;
+    const LLSD& choices = req_response.get("choices");
+    if (choices.isArray() && choices.size() > 0)
+    { // Dig into results for the reply text
+        const LLSD& chat_message_full = choices[0];
+        if (chat_message_full.isMap())
+        {
+            const LLSD& chat_message = chat_message_full.get("message");
+            if (chat_message.isMap())
+            {
+                ai_message = chat_message.get("content").asString();
+            }
+        }
+    }
+
+    if (ai_message.length())
+    {
+        FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
+    }
+    else
+    {
+        LL_WARNS("AIChat") << "Failed to get message from LM Studio chat response:  " << http_results << LL_ENDL;
+        setRequestBusy(false);
+        return false;
+    }
+
+    setRequestBusy(false);
+    return true;
+}
+
+
+// ------------------------------------------------
 // Use nomi.ai
 
 // curl - X POST - H "Authorization: Bearer ea123456-c9c1-4990-8fed-216ba1c692eb" \
@@ -838,30 +991,27 @@ void FSAINomiService::aiChatTargetChanged(const std::string& previous_name, cons
 }
 
 
-
 // ------------------------------------------------
-// Use local LLM via LM Studio
-FSAILMStudioService::FSAILMStudioService(const std::string& name) : FSAIService(name)
+// Use local LLM via Ollama
+FSAIOllamaService::FSAIOllamaService(const std::string& name) : FSAIService(name)
 {
-    LL_INFOS("AIChat") << "created FSAILMStudioService" << LL_ENDL;
+    LL_INFOS("AIChat") << "created FSAIOllamaService" << LL_ENDL;
 };
 
-
-FSAILMStudioService::~FSAILMStudioService()
+FSAIOllamaService::~FSAIOllamaService()
 {
-    LL_INFOS("AIChat") << "deleting FSAILMStudioService" << LL_ENDL;
+    LL_INFOS("AIChat") << "deleting FSAIOllamaService" << LL_ENDL;
 };
 
-
-// Called with new config values, getAIConfig() still contains old values 
-bool FSAILMStudioService::validateConfig(const LLSD& config)
+// Called with new config values, getAIConfig() still contains old values
+bool FSAIOllamaService::validateConfig(const LLSD& config)
 {
     // to do - sanity check config values
     return true;
 };
 
-void FSAILMStudioService::sendChatToAIService(const std::string& message, bool request_direct)
-{   // Send message to the AI service
+void FSAIOllamaService::sendChatToAIService(const std::string& message, bool request_direct)
+{ // Send message to the AI service
     if (!okToSendChatToAIService(message, request_direct))
     {
         return;
@@ -871,48 +1021,122 @@ void FSAILMStudioService::sendChatToAIService(const std::string& message, bool r
     mRequestDirect = request_direct;
 
     setRequestBusy();
-    LLCoros::instance().launch("FSAILMStudioService::sendMessageToAICoro",
-                                boost::bind(&FSAILMStudioService::sendMessageToAICoro, this, message));
+    LLCoros::instance().launch("FSAIOllamaService::sendMessageToAICoro",
+                               boost::bind(&FSAIOllamaService::sendMessageToAICoro, this, message));
 }
 
-bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
+inline constexpr char OLLAMA_SYSTEM_PROMPT_FILENAME[] = "ollama_system_prompt.txt";
+
+bool FSAIOllamaService::sendMessageToAICoro(const std::string& message)
 {
-    // curl http://localhost:1234/v1/chat/completions \
-    //   -H "Content-Type: application/json" \
-    //   --max-time 180 \
-    //   -d '{ "model" : "{{model}}",
-    //        "char" : "FriendlyBot",
-    //        "messages" : [{ "role": "user", "content": "What is your name?" }],
-    //        "temperature" : 0.7,
-    //        "max_tokens" : 1000,
-    //        "max_completion_tokens" : 200,
-    //        "stream" : "false"
-    //      }'
+    // $ curl http://localhost:11434/api/chat -d '{
+    //    "model" : "llama3.2",
+    //    "messages" : [
+    //          { "role": "user", "content": "what is your name?" }
+    //          ],
+    //    "stream" : false
+    //    }'
 
-    // Expect "http://localhost:1234/v1/" as the base url
+    //{
+    //    "model": "llama3.2",
+    //    "created_at": "2025-01-03T01:46:26.6701524Z",
+    //    "response": "I'm an artificial intelligence model known as Llama. Llama stands for \"Large Language Model Meta AI.\"",
+    //    "done": true,
+    //    "done_reason": "stop",
+    //    "context": [
+    //        128006, 9125, 128007, 271, 38766, 1303, 33025, 2696,   25,     6790,  220,    2366,  18,    271,  128009, 128006, 882,
+    //        128007, 271,  3923,   374, 701,   836,  30,    128009, 128006, 78191, 128007, 271,   40,    2846, 459,    21075,  11478,
+    //        1646,   3967, 439,    445, 81101, 13,   445,   81101,  13656,  369,   330,    35353, 11688, 5008, 16197,  15592,  1210
+    //    ],
+    //    "total_duration": 291963300,
+    //    "load_duration": 37027900,
+    //    "prompt_eval_count": 30,
+    //    "prompt_eval_duration": 26000000,
+    //    "eval_count": 23,
+    //    "eval_duration": 226000000
+    //}
 
-    std::string url = getBaseUrl().append("chat/completions");
+    // Expect "http://localhost:11434/api/" as the base url
+
+    std::string url = getBaseUrl(true).append("chat");
 
     LL_DEBUGS("AIChat") << "sendMessageToAICoro starting with URL: " << url << " and message: " << message << LL_ENDL;
 
     LLCore::HttpRequest::policy_t               http_policy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t http_adapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", http_policy));
     LLCore::HttpRequest::ptr_t                  http_request(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t http_options(new LLCore::HttpOptions);
+    LLCore::HttpOptions::ptr_t                  http_options(new LLCore::HttpOptions);
     http_options->setTimeout(AI_REQUEST_TIMEOUT);
 
-    LLCore::HttpHeaders::ptr_t headers = createHeaders(false);   // don't need Authorization
+    LLCore::HttpHeaders::ptr_t headers = createHeaders(false); // don't need Authorization
 
     // Build the message
-    LLSD body = LLSD::emptyMap();
-    body["messages"] = LLSD::emptyArray();      // Use LM Studio's context window for chat history
-    body["messages"].append(LLSD::emptyMap());
-    body["messages"][0]["role"] = "user";
-    body["messages"][0]["content"] = message;   // TBD future - add system messages here?
-    body["stream"]   = "false";
+    // https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
+    LLSD body                      = LLSD::emptyMap();
+    body["messages"]               = LLSD::emptyArray(); // Use LM Studio's context window for chat history
+    body["stream"]                 = false;
+    body["model"]                  = getAIConfig().get(AI_MODEL).asString(); // "llama3.2"
 
-    // Values like "char", "model", "temperature", "max_tokens", "max_completion_tokens"
-    //  aren't exposed in the Firestorm UI but are available in LM Studio
+    LLSD latest_msg = LLSD::emptyMap();
+    if (true)
+    {   // Check for system prompt file
+        const std::string filename   = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, OLLAMA_SYSTEM_PROMPT_FILENAME);
+        std::string sys_prompt      = LLFile::getContents(filename);
+        if (sys_prompt.empty())
+        {
+            LL_WARNS("AIChat") << "No Ollama system prompt found at " << filename << LL_ENDL;
+        }
+        else
+        {
+            LL_DEBUGS("AIChat") << "Sending " << sys_prompt.length() << " bytes system prompt" << LL_ENDL;
+            latest_msg["role"]    = std::string("system");
+            latest_msg["content"] = sys_prompt;
+        }
+    }
+
+    // Add history
+    constexpr size_t CONTEXT_MAX_BYTES = 1024 * 8;      // To do - add configuration value
+    if (true)
+    {
+        size_t context_size = 0;
+        S32 msg_index = 0;
+        for (ai_chat_history_t::const_reverse_iterator riter = FSAIChatMgr::getInstance()->getAIChatHistory().rbegin();
+             riter != FSAIChatMgr::getInstance()->getAIChatHistory().rend();
+             riter++)
+        {
+            const std::string& text = riter->first;   // Get the chat message
+            const char*      sender = riter->second;  // Get source
+            if (context_size + text.size() > CONTEXT_MAX_BYTES)
+            {   // This would go over the size limit
+                break;
+            }
+            // Add message from history to outgoing message to Ollama
+            latest_msg["role"]    = std::string(sender);
+            latest_msg["content"] = text;
+            body["messages"].insert(0, latest_msg); // Add to the front as oldest first
+            context_size += text.size();
+        }
+
+        LL_DEBUGS("AIChatHistory");
+        for (LLSD::array_const_iterator hist_iter = body["messages"].beginArray();
+             hist_iter != body["messages"].endArray(); hist_iter++)
+        {
+            LL_CONT << "  " << hist_iter->get("role").asString() << ": " << hist_iter->get("content").asString() << "\n";
+        }
+        LL_ENDL;
+
+        LL_DEBUGS("AIChat") << "Ollama request contains " << body["messages"].size() << " messages with "
+                            << context_size << " bytes" << LL_ENDL;
+    }
+
+    // Add the new message from user at the end
+    latest_msg            = LLSD::emptyMap();
+    latest_msg["role"]    = std::string(AI_HISTORY_USER);
+    latest_msg["content"] = message;
+    body["messages"].append(latest_msg);
+
+    // Values like "char", "temperature", "max_tokens", "max_completion_tokens"
+    //  are optional and not exposed in the Firestorm UI yet
     //
     // body["char"] = getAIConfig().get(AI_CHARACTER_ID).asString();
     // body["model"] = "{{model}}";
@@ -920,8 +1144,9 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     // body["max_tokens"] = 1000;              // to do - use a config value
     // body["max_completion_tokens"] = 200;    // to do - use a config value
 
-    LLSD req_response   = http_adapter->postJsonAndSuspend(http_request, url, body,
-                                                           http_options, headers);
+
+    // Send it to Ollama
+    LLSD               req_response = http_adapter->postJsonAndSuspend(http_request, url, body, http_options, headers);
     LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     LLCore::HttpStatus status       = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(http_results);
 
@@ -929,48 +1154,34 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
                         << ", req_response: " << req_response << LL_ENDL;
     if (status.getStatus() != 0)
     {
-        LL_WARNS("AIChat") << "Error status from LM Studio chat request:  " << http_results << LL_ENDL;
+        LL_WARNS("AIChat") << "Error status from Ollama chat request:  " << http_results << LL_ENDL;
         setRequestBusy(false);
         return false;
     }
 
-    // {
-    //  "id": "chatcmpl-w4bj61234567890uxy8k",
-    //  "object": "chat.completion",
-    //  "created": 1734914704,
-    //  "model": "llama-3.1-8b-lexi-uncensored-v2",
-    //  "choices": [
-    //    {
-    //      "index": 0,
-    //      "message": {
-    //        "role": "assistant",
-    //        "content": "My name is ... <snipped long reply>"
-    //      },
-    //      "logprobs": null,
-    //      "finish_reason": "stop"
-    //    }
-    //  ],
-    //  "usage": {
-    //    "prompt_tokens": 362,    * Experiments:
-    //    "completion_tokens": 152,  * compare these numbers
-    //    "total_tokens": 514        * with limits set in LM Studio
-    //  },
-    //  "system_fingerprint": "llama-3.1-8b-lexi-uncensored-v2"
+    // req_response without http results:
+    // {  'created_at':'2025-01-03T02:35:52.5077438Z',
+    //    'done':1,
+    //    'done_reason':'stop',
+    //    'eval_count':i53,
+    //    'eval_duration':i879000000,
+    //    'load_duration':i746381904,
+    //    'message':
+    //        {'content':'This conversation has just started. I\'m happy to help you with any bugs or issues you\'re experiencing, but I
+    //        don\'t have any prior knowledge about a previous issue or "bug" that you may have been working on. How can I assist you
+    //        today?',
+    //         'role':'assistant'},
+    //    'model':'llama3.2',
+    //    'prompt_eval_count':i32,
+    //    'prompt_eval_duration':i534000000,
+    //    'total_duration':i-2127919492
     //}
 
     std::string ai_message;
-    const LLSD& choices = req_response.get("choices");
-    if (choices.isArray() && choices.size() > 0)
-    {   // Dig into results for the reply text
-        const LLSD& chat_message_full = choices[0];
-        if (chat_message_full.isMap())
-        {
-            const LLSD& chat_message = chat_message_full.get("message");
-            if (chat_message.isMap())
-            {
-                ai_message = chat_message.get("content").asString();
-            }
-        }
+    const LLSD& msg = req_response.get("message");
+    if (msg.isMap())
+    { // Dig into results for the reply text
+        ai_message = msg.get("content").asString();
     }
 
     if (ai_message.length())
@@ -979,7 +1190,7 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     }
     else
     {
-        LL_WARNS("AIChat") << "Failed to get message from LM Studio chat response:  " << http_results << LL_ENDL;
+        LL_WARNS("AIChat") << "Failed to get message from Ollama chat response:  " << http_results << LL_ENDL;
         setRequestBusy(false);
         return false;
     }
@@ -987,7 +1198,6 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     setRequestBusy(false);
     return true;
 }
-
 
 
 // ------------------------------------------------

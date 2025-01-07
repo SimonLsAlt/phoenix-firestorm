@@ -155,6 +155,17 @@ void FSPanelAIInfo::updatePromptAndTextEditor(const std::string& lineEditorName,
 }
 
 
+void FSPanelAIInfo::updatePromptsAndEditors(const LLSD& ai_config, const std::string& ai_service)
+{
+    LL_DEBUGS("AIChat") << "Updating UI for " << ai_service << LL_ENDL;
+    updatePromptAndTextEditor(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service);
+    updatePromptAndTextEditor(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service);
+    updatePromptAndTextEditor(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service);
+    updatePromptAndTextEditor(AI_MODEL, AI_MODEL_PROMPT, ai_config, ai_service);
+}
+
+
+
 
 
 // -----------------------------------------------------------------------------
@@ -199,9 +210,7 @@ void FSPanelAIConfiguration::onSelectAIService()
         FSAIChatMgr::getInstance()->switchAIConfig(ai_service_name);
 
         const LLSD& ai_config = FSAIChatMgr::getInstance()->getAIConfig();
-        updatePromptAndTextEditor(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service_name);
-        updatePromptAndTextEditor(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service_name);
-        updatePromptAndTextEditor(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service_name);
+        updatePromptsAndEditors(ai_config, ai_service_name);
     }
 }
 
@@ -223,9 +232,8 @@ void FSPanelAIConfiguration::syncUIWithAISettings()
     {
         cb->setValue(ai_service_name);
     }
-    updatePromptAndTextEditor(AI_ENDPOINT, AI_ENDPOINT_PROMPT, ai_config, ai_service_name);
-    updatePromptAndTextEditor(AI_API_KEY, AI_API_KEY_PROMPT, ai_config, ai_service_name);
-    updatePromptAndTextEditor(AI_CHARACTER_ID, AI_CHARACTER_ID_PROMPT, ai_config, ai_service_name);
+
+    updatePromptsAndEditors(ai_config, ai_service_name);
 }
 
 
@@ -240,7 +248,8 @@ bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const s
     if (service_name == LLM_GEMINI)
     {
         return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
-                ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT);
+                ui_name == AI_API_KEY || ui_name == AI_API_KEY_PROMPT ||
+                ui_name == AI_MODEL_PROMPT || ui_name == AI_MODEL);
     }
     if (service_name == LLM_KINDROID)
     {
@@ -257,6 +266,11 @@ bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const s
     {   // Character ID is embedded in the service url
         return (ui_name == AI_ENDPOINT_PROMPT || ui_name == AI_ENDPOINT ||
                 ui_name == AI_API_KEY_PROMPT || ui_name == AI_API_KEY);
+    }
+    if (service_name == LLM_OLLAMA)
+    {   // Local access, no API key
+        return (ui_name == AI_ENDPOINT || ui_name == AI_ENDPOINT_PROMPT ||
+                ui_name == AI_MODEL_PROMPT || ui_name == AI_MODEL);
     }
     if (service_name == LLM_OPENAI)
     {   // Use endpoint as root, characater id as assistant id.   To do - customize label to use "assistant"
@@ -288,6 +302,7 @@ void FSPanelAIConfiguration::onApplyConfig()
     addInLineEditorValue(AI_ENDPOINT, ai_config);
     addInLineEditorValue(AI_API_KEY, ai_config);
     addInLineEditorValue(AI_CHARACTER_ID, ai_config);
+    addInLineEditorValue(AI_MODEL, ai_config);
 
     FSAIChatMgr::getInstance()->setAIConfigValues(ai_config);
 }
@@ -301,7 +316,7 @@ void FSPanelAIConfiguration::addInLineEditorValue(const std::string& ui_name, LL
         le = getChild<LLLineEditor>(ui_name);
         if (le)
         {
-            ai_config[ui_name]   = le->getValue().asString();
+            ai_config[ui_name] = le->getValue().asString();
         }
     }
 }
@@ -314,7 +329,7 @@ bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, cons
     }
     if (service_name == LLM_GEMINI)
     {
-        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY);
+        return (config_name == AI_ENDPOINT || config_name == AI_API_KEY || config_name == AI_MODEL);
     }
     if (service_name == LLM_KINDROID)
     {
@@ -327,6 +342,10 @@ bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, cons
     if (service_name == LLM_NOMI)
     { // Character ID is embedded in the service url so doesn't need AI_CHARACTER_ID
         return (config_name == AI_ENDPOINT || config_name == AI_API_KEY);
+    }
+    if (service_name == LLM_OLLAMA)
+    {
+        return (config_name == AI_ENDPOINT || config_name == AI_MODEL);
     }
     if (service_name == LLM_OPENAI)
     {   // Needs all 3 basics
@@ -370,19 +389,17 @@ bool FSPanelAIConversation::postBuild()
     LLTextBox*    tb = getChild<LLTextBox>(UI_AI_CHAT_MESSAGES);
     if (te && tb)
     {   // Display any last messages from history
+        std::string user_chat(AI_HISTORY_USER);
+        std::string ai_chat(AI_HISTORY_ASSISTANT);
         for (auto it = chat_history.rbegin(); it != chat_history.rend(); ++it)
         {
-            if (LLStringUtil::startsWith(*it, "AI:") && te->getValue().asStringRef().empty())
+            if (it->second == ai_chat)
             {
-                te->setText((*it).substr(3));
-                if (!tb->getValue().asStringRef().empty())
-                    break;
+                te->appendText(it->first, true /* newline */);
             }
-            else if (LLStringUtil::startsWith(*it, "SL:") && te->getValue().asStringRef().empty())
+            else if (it->second == user_chat)
             {
-                tb->setText((*it).substr(3));
-                if (!te->getValue().asStringRef().empty())
-                    break;
+                tb->appendText(it->first, true /* newline */);
             }
         }
     }

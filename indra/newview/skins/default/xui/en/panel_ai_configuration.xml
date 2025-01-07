@@ -62,9 +62,14 @@
          name="LMStudio"
          value="LMStudio" />
         <combo_box.item
-         label="Nomi.ai"
+         label="Nomi.ai
+         "
          name="Nomi.ai"
          value="Nomi.ai" />
+        <combo_box.item
+         label="Ollama"
+         name="Ollama"
+         value="Ollama" />
         <combo_box.item
          label="OpenAI"
          name="OpenAI"
@@ -154,6 +159,32 @@
      max_length_bytes="256"
      name="character_id"
      width="320" />
+
+    <text
+     type="string"
+     length="1"
+     font="SansSerif"
+     follows="top"
+     top_pad="12"
+     height="23"
+     layout="topleft"
+     left="20"
+     name="model_prompt"
+     width="120">
+        Model:
+    </text>
+    <line_editor
+     border_style="line"
+     border_thickness="1"
+     font="SansSerif"
+     follows="left|top"
+     left_pad="10"
+     height="23"
+     layout="topleft"
+     max_length_bytes="256"
+     name="model"
+     width="320" />
+
     <button
      enabled="true"
      top_pad="12"

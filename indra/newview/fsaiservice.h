@@ -171,6 +171,23 @@ protected:
 };
 
 // ------------------------------------------------
+// Use chat via local LLM in Ollama
+class FSAIOllamaService : public FSAIService
+{
+public:
+    FSAIOllamaService(const std::string& name);
+    ~FSAIOllamaService();
+
+    virtual void sendChatToAIService(const std::string& message, bool request_direct = false) override;
+    virtual bool saveChatHistory() const { return true; };
+
+protected:
+    virtual bool validateConfig(const LLSD& config) override;
+
+    bool sendMessageToAICoro(const std::string& message);
+};
+
+// ------------------------------------------------
 // Use chat via OpenAI
 class FSAIOpenAIService : public FSAIService
 {

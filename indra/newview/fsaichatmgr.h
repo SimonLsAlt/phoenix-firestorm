@@ -46,9 +46,10 @@
 class FSAIService;
 
 // Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
-typedef std::deque<std::string> ai_chat_history_t;
-static const S32 AI_HISTORY_MAX = 20;  // up to 10 message / reply pairs
+typedef std::deque<std::pair<std::string, char *>> ai_chat_history_t;
 
+// To do - make this a config value?  Note this is not the size limit for sending to the AI service
+static const S32 AI_HISTORY_MAX_MSGS = 1024;
 
 
 class FSAIChatMgr : public LLSingleton<FSAIChatMgr>

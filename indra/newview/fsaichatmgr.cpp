@@ -335,8 +335,8 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
                 LL_INFOS("AIChat") << "Sending chat from avatar to " << mAIService->getName() << " AI service" << LL_ENDL;
                 mAIService->sendChatToAIService(message, false);
                 if (mAIService->saveChatHistory())
-                {
-                    mAIChatHistory.push_front(std::string("SL:").append(message));
+                {   // Most recent goes on the back
+                    mAIChatHistory.push_back({ message, (char*)AI_HISTORY_USER });
                     trimAIChatHistoryData();
                 }
             }
@@ -373,7 +373,7 @@ void FSAIChatMgr::resetChat()
     mChatSession.setNull();  // Chat session id
     mChattyAgent.setNull();  // Other agent
     mChattyDisplayName.clear();
-    mAIChatHistory.clear();  // Last chat messages saved as "SL: <from other avatar>" or "AI: <from LLM>"
+    mAIChatHistory.clear();
     mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);
 
     FSFloaterAIChat* floater = FSFloaterAIChat::getAIChatFloater();
@@ -411,8 +411,10 @@ void FSAIChatMgr::idle()
     }
 }
 
-void FSAIChatMgr::processIncomingAIResponse(const std::string& ai_message, bool request_direct)
+void FSAIChatMgr::processIncomingAIResponse(const std::string& untrimmed_ai_message, bool request_direct)
 {   // Just save message data - called from coroutine
+    std::string ai_message(untrimmed_ai_message);
+    LLStringUtil::trim(ai_message);
     if (mAIReplyQueue.size() < AI_REPLY_QUEUE_LIMIT)
     {
         mAIReplyQueue.push({ ai_message, request_direct });  // Push on the back.
@@ -470,8 +472,8 @@ void FSAIChatMgr::finallyProcessIncomingAIResponse(const std::string& ai_message
         LLIMModel::sendMessage(ai_message, mChatSession, mChattyAgent, IM_NOTHING_SPECIAL);
 
         if (mAIService->saveChatHistory())
-        {
-            mAIChatHistory.push_front(std::string("AI:").append(ai_message));
+        {   // Most recent goes on the back
+            mAIChatHistory.push_back({ ai_message, (char*)AI_HISTORY_ASSISTANT });
             trimAIChatHistoryData();
         }
     }
@@ -481,8 +483,8 @@ void FSAIChatMgr::finallyProcessIncomingAIResponse(const std::string& ai_message
 
 void FSAIChatMgr::trimAIChatHistoryData()
 {  // Limit size of mAIChatHistory
-    while (mAIChatHistory.size() > AI_HISTORY_MAX)
-    {
-        mAIChatHistory.pop_back();
+    while (mAIChatHistory.size() > AI_HISTORY_MAX_MSGS)
+    {   // Get rid of oldest data
+        mAIChatHistory.pop_front();
     }
 }

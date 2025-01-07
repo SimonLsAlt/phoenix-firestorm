@@ -49,6 +49,7 @@ inline constexpr char LLM_CONVAI[]   = "Convai";
 inline constexpr char LLM_GEMINI[]   = "Gemini";
 inline constexpr char LLM_KINDROID[] = "Kindroid.ai";
 inline constexpr char LLM_LMSTUDIO[] = "LMStudio";
+inline constexpr char LLM_OLLAMA[] = "Ollama";
 inline constexpr char LLM_OPENAI[]   = "OpenAI";
 inline constexpr char LLM_NOMI[]     = "Nomi.ai";
 
@@ -58,6 +59,8 @@ inline constexpr char AI_API_KEY_PROMPT[] = "api_key_prompt";
 inline constexpr char AI_API_KEY[] = "api_key";
 inline constexpr char AI_CHARACTER_ID_PROMPT[] = "character_id_prompt";
 inline constexpr char AI_CHARACTER_ID[] = "character_id";
+inline constexpr char AI_MODEL_PROMPT[] = "model_prompt";
+inline constexpr char AI_MODEL[]        = "model";
 
 // Elements in the conversation tab
 inline constexpr char UI_AI_CHAT_WITH[]      = "ai_chat_with";
@@ -73,5 +76,10 @@ inline constexpr char UI_AI_SEND_BTN[]             = "ai_send_btn";
 // also uses UI_AI_CHAT_EDITOR and UI_AI_CHAT_MESSAGES
 
 inline constexpr char UI_AI_BOTS_PANELS[] = "ai_bots_panels";
+
+
+// Source string for chat messages stored in history.  Currently using Ollama values
+inline constexpr char AI_HISTORY_USER[] = "user";
+inline constexpr char AI_HISTORY_ASSISTANT[] = "assistant";
 
 #endif
