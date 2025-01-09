@@ -55,6 +55,9 @@ public:
     // Save in history?
     virtual bool saveChatHistory() const { return false; };
 
+    // Split response up if multiple "/me" emotes exist
+    virtual void splitAndProcessAIResponse(const std::string& ai_message, bool request_direct);
+
     // Flag indicating a request is processing
     void setRequestBusy(bool busy = true) { mRequestBusy = busy; };
     bool getRequestBusy() const           { return mRequestBusy; };

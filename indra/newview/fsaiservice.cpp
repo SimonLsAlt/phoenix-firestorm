@@ -170,6 +170,44 @@ LLCore::HttpHeaders::ptr_t FSAIService::createHeaders(bool add_authorization /* 
 }
 
 
+void FSAIService::splitAndProcessAIResponse(const std::string& ai_message, bool request_direct)
+{   // Split response up if multiple "/me" emotes exist.   This does not take into account
+    //   someone intentionally using "/me" in the middle of a message, so that case can get weird
+    std::vector<std::string> split_messages;
+    size_t                   pos      = 1;
+    size_t                   prev_pos = 0;
+
+    constexpr S32 MAX_SPLIT_MES = 5;     // Don't let this blow up
+    while ((pos = ai_message.find("/me", pos)) != std::string::npos && split_messages.size() < MAX_SPLIT_MES)
+    {
+        if (pos > prev_pos)
+        {   // extract up to the next "/me"
+            split_messages.push_back(ai_message.substr(prev_pos, pos - prev_pos));
+        }
+        prev_pos = pos;
+        pos += 3;       // Move past "/me"
+    }
+
+    // Add the remaining part of the string including the last "/me"
+    if (prev_pos < ai_message.length())
+    {
+        split_messages.push_back(ai_message.substr(prev_pos));
+    }
+
+    // Process each message
+    for (const auto& cur_message : split_messages)
+    {
+        FSAIChatMgr::getInstance()->processIncomingAIResponse(cur_message, mRequestDirect);
+    }
+
+    if (split_messages.size() > 1)
+    {
+        LL_DEBUGS("AIChat") << "Split response into " << (S32) split_messages.size() << " messages due to use of /me" << LL_ENDL;
+    }
+}
+
+
+
 // ------------------------------------------------
 // Use Convai.ai
 
@@ -742,7 +780,7 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     body["messages"] = LLSD::emptyArray(); // Use LM Studio's context window for chat history
     body["messages"].append(LLSD::emptyMap());
     body["messages"][0]["role"]    = "user";
-    body["messages"][0]["content"] = message; // TBD future - add system messages here?
+    body["messages"][0]["content"] = message; // TBD future - add system message here?
     body["stream"]                 = "false";
 
     // Values like "char", "model", "temperature", "max_tokens", "max_completion_tokens"
@@ -750,9 +788,9 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
     //
     // body["char"] = getAIConfig().get(AI_CHARACTER_ID).asString();
     // body["model"] = "{{model}}";
-    // body["temperature"] = 0.7;              // to do - use a config value
-    // body["max_tokens"] = 1000;              // to do - use a config value
-    // body["max_completion_tokens"] = 200;    // to do - use a config value
+    // body["temperature"] = 0.7;              // TBD - expose as a config value?
+    // body["max_tokens"] = 1000;              // TBD - expose as a config value?
+    // body["max_completion_tokens"] = 200;    // TBD - expose as a config value?
 
     LLSD               req_response = http_adapter->postJsonAndSuspend(http_request, url, body, http_options, headers);
     LLSD               http_results = req_response.get(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
@@ -808,7 +846,7 @@ bool FSAILMStudioService::sendMessageToAICoro(const std::string& message)
 
     if (ai_message.length())
     {
-        FSAIChatMgr::getInstance()->processIncomingAIResponse(ai_message, mRequestDirect);
+        splitAndProcessAIResponse(ai_message, mRequestDirect);
     }
     else
     {
