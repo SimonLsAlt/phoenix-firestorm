@@ -1016,12 +1016,15 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     }
                     // </FS:PP>
 
-                    // <FS:AI chat>
-                    LL_INFOS("AIChat") << "IM_NOTHING_SPECIAL session_id( " << session_id << " ), from_id( " << from_id << " )"
+                    // <FS:AIchat>
+                    LL_DEBUGS("AIChat") << "IM_NOTHING_SPECIAL session_id( " << session_id << " ), from_id( " << from_id << " )"
+                                       << (offline == IM_OFFLINE ? ", offline " : ", online ")
                                        << ", name " << name << ", message: " << message << LL_ENDL;
-                    // route message for AI chat processing
-                    FSAIChatMgr::getInstance()->processIncomingChat(from_id, message, name, session_id);
-                    // </FS:AI chat>
+                    if (offline != IM_OFFLINE)  // route message for AI chat processing
+                    {
+                        FSAIChatMgr::getInstance()->processIncomingChat(from_id, message, name, session_id);
+                    }
+                    // </FS:AIChat>
 
                     buffer = saved + message;
 

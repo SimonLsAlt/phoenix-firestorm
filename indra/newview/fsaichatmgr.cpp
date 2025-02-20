@@ -283,7 +283,14 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
         {   // Conversation went dead, reset for new incoming chat
             resetChat();
         }
-        if (mChatSession.isNull() && mAIService)
+
+        if (!mAIService)
+        {
+            LL_WARNS("AIChat") << "No AI service available, unable to send chat" << LL_ENDL;
+            return;
+        }
+
+        if (mChatSession.isNull())
         {   // Start a new chat
             // to do - check if ID is on allow list, etc - have some sort of access control?
             mChatSession = sessionid;  // Save info

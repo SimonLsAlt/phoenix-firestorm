@@ -41,7 +41,7 @@
     <view_border
      bevel_style="none"
      follows="top|left"
-     height="160"
+     height="140"
      layout="topleft"
      left="6"
      top_pad="4"
@@ -52,8 +52,8 @@
      length="1"
      font="SansSerif"
      follows="top"
-     top_pad="-156"
-     height="156"
+     top_pad="-136"
+     height="136"
      layout="topleft"
      left="10"
      word_wrap="true"
@@ -61,7 +61,6 @@
      width="465">
         No messages yet
     </text>
-
 
     <text
      type="string"
@@ -79,7 +78,7 @@
     <view_border
      bevel_style="none"
      follows="top|left"
-     height="160"
+     height="130"
      layout="topleft"
      left="6"
      top_pad="4"
@@ -88,8 +87,8 @@
     <text_editor
      enabled="true"
      follows="top"
-     top_pad="-156"
-     height="156"
+     top_pad="-132"
+     height="126"
      layout="topleft"
      left="10"
      max_length="1024"
@@ -98,6 +97,42 @@
      word_wrap="true">
         No reply from chat system yet
     </text_editor>
+
+    <check_box
+     enabled="true"
+     follows="top"
+     top_pad="22"
+     height="23"
+     label="Include image:  "
+     layout="topleft"
+     left="20"
+     font="SansSerif"
+     name="include_pic"
+     tool_tip="Checking this box sends an image with the direct AI message"
+     top_delta="32"
+     width="132" />
+
+    <line_editor
+     border_style="line"
+     border_thickness="1"
+     font="SansSerif"
+     follows="left|top"
+     left_pad="12"
+     height="23"
+     layout="topleft"
+     max_length_bytes="128"
+     name="ai_image_2_send"
+     width="200" />
+
+    <button
+     enabled="true"
+     height="24"
+     follows="left|top"
+     left_pad="12"
+     layout="topleft"
+     label="Pick"
+     name="ai_pick_snap_btn"
+     width="60" />
 
     <button
      enabled="true"

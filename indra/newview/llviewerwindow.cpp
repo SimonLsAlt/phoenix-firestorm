@@ -5951,6 +5951,8 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
     LL_INFOS() << "Saving snapshot to " << filepath << LL_ENDL;
     if (image->save(filepath))
     {
+        gViewerWindow->setLastSnapshotFilename(filepath);
+
         playSnapshotAnimAndSound();
         if (gSavedSettings.getBOOL("FSLogSnapshotsToLocal"))
         {

@@ -466,6 +466,10 @@ public:
     // </FS:TT>
 
     static std::string getLastSnapshotDir();
+    // <FS:AIChat>
+    void               setLastSnapshotFilename(const std::string& filename) { mLastSnapshotFilename = filename; };
+    const std::string& getLastSnapshotFilename() const                      { return mLastSnapshotFilename; };
+    // </FS:AIChat>
 
     LLView* getFloaterSnapRegion() { return mFloaterSnapRegion; }
     LLPanel* getChicletContainer() { return mChicletContainer; }
@@ -559,6 +563,10 @@ private:
     LLPointer<LLViewerObject>   mDragHoveredObject;
 
     static LLTrace::SampleStatHandle<>  sMouseVelocityStat;
+
+    // <FS:AIChat>
+    std::string mLastSnapshotFilename;  // Last snapshot to disk name
+    // </FS:AIChat>
 };
 
 //

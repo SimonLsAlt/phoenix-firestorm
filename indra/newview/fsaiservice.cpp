@@ -108,7 +108,7 @@ FSAIService* FSAIService::createFSAIService(const std::string& service_name)
 // virtual but useful base class
 bool FSAIService::okToSendChatToAIService(const std::string& message, bool request_direct)
 {
-    // to do - better config testing, use validateConfig()
+    // to do - better config data testing, use validateConfig()
     std::string base_url = getAIConfig().get(AI_ENDPOINT);
     if (base_url.empty())
     {
@@ -205,6 +205,30 @@ void FSAIService::splitAndProcessAIResponse(const std::string& ai_message, bool 
         LL_DEBUGS("AIChat") << "Split response into " << (S32) split_messages.size() << " messages due to use of /me" << LL_ENDL;
     }
 }
+
+// Common check if message should be dropped
+bool FSAIService::messageToAIShouldBeDropped(const std::string& message, bool request_direct)
+{
+    if (!request_direct)
+    { // If someday more incoming message filtering is needed, this is a good bottleneck
+        std::string msg_lower = utf8str_tolower(message);
+        if (msg_lower.find("you are chatting with a bot") == 0)
+        { // @simonlsalt:  Ugly match, but a bot warning comes in from SL servers spoofing as if from the bot account
+            // This gets in the way if two bots talk to each other, which is an amusing experiment.  I can't complain too much, I wrote it
+            // :(
+            LL_WARNS("AIChat") << "Dropping bot warning message:  " << message << LL_ENDL;
+            return true;
+        }
+
+        if (LLStringUtil::startsWith(msg_lower, std::string("user not online")))
+        { // Don't have a chat loop with the system offline message
+            LL_WARNS("AIChat") << "Ignoring offline system message:  " << message << LL_ENDL;
+            return true;
+        }
+    }
+    return false;
+}
+
 
 
 
@@ -647,9 +671,8 @@ bool FSAIKindroidService::sendMessageToAICoro(const std::string& message)
 
 void FSAIKindroidService::aiChatTargetChanged(const std::string& previous_name, const std::string& new_name)
 { // Caller should ensure there is a name change and new_name is not empty
-
     if (!okToSendChatToAIService("dummy string", false))
-    { // If something is totally wonky, don't send it
+    {   // Ensure system is enabled
         return;
     }
 
@@ -917,12 +940,7 @@ bool FSAINomiService::messageToAIShouldBeDropped(const std::string& message, boo
             LL_WARNS("AIChat") << "Dropping regular message with OOC:  " << message << LL_ENDL;
             return true;
         }
-        if (msg_lower.find("you are chatting with a bot") == 0)
-        {   // @simonlsalt:  Ugly match, but a bot warning comes in from SL servers spoofing as if from the bot account
-            // This gets in the way if two bots talk to each other, which is an amusing experiment.  I can't complain too much, I wrote it :(
-            LL_WARNS("AIChat") << "Dropping bot warning message:  " << message << LL_ENDL;
-            return true;
-        }
+        return FSAIService::messageToAIShouldBeDropped(message, request_direct);
     }
     return false;
 }

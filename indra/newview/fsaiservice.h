@@ -50,7 +50,7 @@ public:
     virtual void aiChatTargetChanged(const std::string& previous_name, const std::string& new_name) {};
 
     // Check if message should be dropped
-    virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct) { return false; };
+    virtual bool messageToAIShouldBeDropped(const std::string& message, bool request_direct);
 
     // Save in history?
     virtual bool saveChatHistory() const { return false; };

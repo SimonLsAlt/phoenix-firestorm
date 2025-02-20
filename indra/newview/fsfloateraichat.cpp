@@ -40,6 +40,7 @@
 #include "lltexteditor.h"
 #include "lltrans.h"
 #include "llviewerregion.h"
+#include "llviewerwindow.h"
 #include "lluictrl.h"
 
 
@@ -228,7 +229,7 @@ void FSPanelAIConfiguration::syncUIWithAISettings()
 
     const std::string& ai_service_name = ai_config.get(AI_SERVICE).asStringRef();
     LLComboBox* cb = getChild<LLComboBox>(AI_SERVICE);
-    if (cb)
+    if (cb && !ai_service_name.empty())
     {
         cb->setValue(ai_service_name);
     }
@@ -280,7 +281,7 @@ bool FSPanelAIConfiguration::enableUIElement(const std::string& ui_name, const s
     }
 
     LL_WARNS("AIChat") << "Unknown LLM " << service_name << " in enableUIElement()" << LL_ENDL;
-    return true;
+    return false;
 }
 
 
@@ -353,7 +354,7 @@ bool FSPanelAIConfiguration::useConfigValue(const std::string& config_name, cons
     }
 
     LL_WARNS("AIChat") << "Unknown LLM " << service_name << " in useConfigValue()" << LL_ENDL;
-    return true;
+    return false;
 }
 
 
@@ -623,6 +624,26 @@ void FSPanelAIDirect2LLM::setAIServiceNamePrompts(const std::string& service_nam
     else
     {
         LL_WARNS("AIChat") << "Unexpected empty UI_AI_SEND_DIRECT_TO prompt, can't set display" << LL_ENDL;
+    }
+
+    LLLineEditor* le = getChild<LLLineEditor>(UI_AI_IMAGE_2_SEND);
+    if (le)
+    {
+        // Set the image filename to last snapshot if it's empty
+        tmp_str = le->getText();
+        if (tmp_str.empty())
+        {
+            tmp_str = gViewerWindow->getLastSnapshotFilename();
+            if (!tmp_str.empty())
+            {
+                LL_DEBUGS("AIChat") << "Set last snapshot filename to " << tmp_str << LL_ENDL;
+                le->setText(tmp_str);
+            }
+       }
+    }
+    else
+    {
+        LL_WARNS("AIChat") << "Unexpected missing UI_AI_IMAGE_2_SEND line editor" << LL_ENDL;
     }
 }
 

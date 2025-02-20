@@ -72,6 +72,7 @@ inline constexpr char UI_AI_RESET_CHAT_BTN[] = "ai_reset_chat_btn";
 // Elements in the direct2LLM tab
 inline constexpr char UI_AI_DIRECT_LLM_CHAT_WITH[] = "ai_direct_llm_chat_with";
 inline constexpr char UI_AI_SEND_DIRECT_TO[]       = "ai_send_direct_to";
+inline constexpr char UI_AI_IMAGE_2_SEND[]         = "ai_image_2_send";
 inline constexpr char UI_AI_SEND_BTN[]             = "ai_send_btn";
 // also uses UI_AI_CHAT_EDITOR and UI_AI_CHAT_MESSAGES
 
