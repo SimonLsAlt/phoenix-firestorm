@@ -94,16 +94,10 @@ class FSPanelAIInfo : public LLPanel
 public:
     FSPanelAIInfo();
 
-    // to do - clean up after more implementation, get rid of unused functions
-    bool postBuild() override;
-
-    virtual bool enableUIElement(const std::string& ui_name, const std::string& service_name) const { return true; };
+    virtual S32  getUIElementYShift(const char* ui_name, const char* service_name) { return 0; };
     virtual void resetChat() {};
 
   protected:
-    void updatePromptsAndEditors(const LLSD& ai_config, const std::string& ai_service);
-    void updatePromptAndTextEditor(const std::string& lineEditorName, const std::string& textBoxName,
-                         const LLSD& ai_config, const std::string& ai_service);
 };
 
 
@@ -117,15 +111,33 @@ public:
     ~FSPanelAIConfiguration() {}
 
     bool postBuild() override;
-    void onSelectAIService();
-    void onApplyConfig();
 
-    bool enableUIElement(const std::string& ui_name, const std::string& service_name) const override;
+    void onSelectAIService();  // Pick the service
+    void onSelectAIMode();     // Change the mode (chat or translations)
+    void onSelectAILanguage(); // Change the translation target language
+    void onApplyConfig(); // Save
 
-  protected:
     void syncUIWithAISettings();
+
+protected:
     void addInLineEditorValue(const std::string& ui_name, LLSD& ai_config) const;
     bool useConfigValue(const std::string& ui_name, const std::string& service_name) const;
+
+    void saveUIRect(const char * ui_ctrl_name);
+
+    typedef std::map<std::string, LLRect> rect_map_t;
+    rect_map_t mOriginalRects; // Map saving original position of UI prompts and text fields
+
+    void createUILayoutData();
+    void fillLayoutData(const char* service,
+                        S32 epp, S32 sp, S32 akp, S32 ak, S32 cip, S32 ci, S32 mp, S32 m);
+    void updatePromptAndTextEditor(const char* line_editor_name, const char* text_box_name, const LLSD& ai_config, const char* ai_service);
+    void updateUIWidgets(const LLSD& ai_config);
+    S32  getUIElementYShift(const char* ui_name, const char* service_name) override;
+
+    typedef std::map<std::string, S32>                   service_layout_data_t; // UI element name to Y offset mapping
+    typedef std::map<std::string, service_layout_data_t> layout_data_t; // Map of AI service name to UI layout positions and visibility
+    layout_data_t mUILayoutData;
 };
 
 

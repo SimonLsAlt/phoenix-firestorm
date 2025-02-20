@@ -34,7 +34,7 @@
      height="23"
      layout="topleft"
      left="10"
-     name="ai_direct_llm_chat_with">
+     name="AIDirectLLMChatWith">
         Direct conversation with [AI_SERVICE_NAME]:
     </text>
 
@@ -72,7 +72,7 @@
      height="23"
      layout="topleft"
      left="10"
-     name="ai_send_direct_to">
+     name="AISendDirectTo">
         Enter message and send to [AI_SERVICE_NAME]:
     </text>
 

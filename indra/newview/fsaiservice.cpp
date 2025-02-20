@@ -169,6 +169,31 @@ LLCore::HttpHeaders::ptr_t FSAIService::createHeaders(bool add_authorization /* 
     return headers;
 }
 
+bool FSAIService::messageToAIShouldBeDropped(const std::string& message, bool request_direct)
+{
+    // Do basic message filtering
+
+    if (!request_direct)
+    {
+        // Reject messages with "OOC:" from user - tbd:  handle differently?
+        std::string msg_lower = utf8str_tolower(message);
+        if (msg_lower.find("ooc:") != std::string::npos)
+        { // Possibly move some of this to base class to reuse in other implementations
+            LL_WARNS("AIChat") << "Dropping regular message with OOC:  " << message << LL_ENDL;
+            return true;
+        }
+        if (msg_lower.find("you are chatting with a bot") == 0)
+        { // @simonlsalt:  Ugly match, but a bot warning comes in from SL servers spoofing as if from the bot account
+            // This gets in the way if two bots talk to each other, which is an amusing experiment.  I can't complain too much, I wrote it
+            // :(
+            LL_WARNS("AIChat") << "Dropping bot warning message:  " << message << LL_ENDL;
+            return true;
+        }
+    }
+    return false;
+}
+
+
 
 void FSAIService::splitAndProcessAIResponse(const std::string& ai_message, bool request_direct)
 {   // Split response up if multiple "/me" emotes exist.   This does not take into account
@@ -905,27 +930,6 @@ void FSAINomiService::sendChatToAIService(const std::string& message, bool reque
                                 boost::bind(&FSAINomiService::sendMessageToAICoro, this, message));
 }
 
-
-bool FSAINomiService::messageToAIShouldBeDropped(const std::string& message, bool request_direct)
-{
-    if (!request_direct)
-    {  // If someday more incoming message filtering is needed, this is a good bottleneck
-        // Reject messages with "OOC:" from user - tbd:  handle differently?
-        std::string msg_lower = utf8str_tolower(message);
-        if (msg_lower.find("ooc:") != std::string::npos)
-        {  // Possibly move some of this to base class to reuse in other implementations
-            LL_WARNS("AIChat") << "Dropping regular message with OOC:  " << message << LL_ENDL;
-            return true;
-        }
-        if (msg_lower.find("you are chatting with a bot") == 0)
-        {   // @simonlsalt:  Ugly match, but a bot warning comes in from SL servers spoofing as if from the bot account
-            // This gets in the way if two bots talk to each other, which is an amusing experiment.  I can't complain too much, I wrote it :(
-            LL_WARNS("AIChat") << "Dropping bot warning message:  " << message << LL_ENDL;
-            return true;
-        }
-    }
-    return false;
-}
 
 bool FSAINomiService::sendMessageToAICoro(const std::string& message)
 {

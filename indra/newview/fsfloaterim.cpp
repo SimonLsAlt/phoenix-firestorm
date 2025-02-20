@@ -31,6 +31,7 @@
 
 #include "fsfloaterim.h"
 
+#include "fsaichatmgr.h"
 #include "fschathistory.h"
 #include "fschatoptionsmenu.h"
 #include "fscommon.h"
@@ -603,6 +604,17 @@ void FSFloaterIM::sendMsg(const std::string& msg)
     if (mSessionInitialized)
     {
         LLIMModel::sendMessage(utf8_text, mSessionID, mOtherParticipantUUID, mDialog);
+
+        // <FS:AI chat>
+        if (mDialog == IM_NOTHING_SPECIAL)
+        {
+            LL_DEBUGS("AIChat") << "Outgoing chat mSessionID( " << mSessionID << " ), mOtherParticipantUUID( " << mOtherParticipantUUID
+                                << " )"
+                                << ", message: " << utf8_text << LL_ENDL;
+            // route message for AI chat processing
+            FSAIChatMgr::getInstance()->processOutgoingChat(utf8_text, mSessionID, mOtherParticipantUUID);
+        }
+        // </FS:AI chat>
     }
     else
     {

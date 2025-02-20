@@ -38,6 +38,7 @@
 #include "llsdserialize.h"
 #include "llavatarnamecache.h"
 #include "llimview.h"
+#include "lltrans.h"
 
 #include "fsaichatmgr.h"
 #include "fsaichatstrings.h"
@@ -55,16 +56,20 @@ static constexpr S32 AI_REPLY_QUEUE_LIMIT = 10;
 
 // ----------------------------------------------------------------------------------------
 
-FSAIChatMgr::FSAIChatMgr() : mAIService(nullptr)
+FSAIChatMgr::FSAIChatMgr() : mAIService(nullptr),
+                             mAIMode(AI_MODE_CHAT),
+                             mTranslateWarningSent(false)
 {
     // Ensure values in case there is no saved settings file
     mAIConfig = LLSD::emptyMap();
-    mAIConfig[AI_CHAT_ON]      = false;
+    mAIConfig[AI_FEATURES_ON]      = false;
     mAIConfig[AI_SERVICE]      = std::string();
 
     mAIConfig[AI_ENDPOINT]     = std::string();    // to do - break apart service specific config settings to live in service class
     mAIConfig[AI_API_KEY]      = std::string();
     mAIConfig[AI_CHARACTER_ID] = std::string();
+    mAIConfig[AI_LLM_MODE]        = std::string(AI_DEFAULT_MODE);
+    mAIConfig[AI_TARGET_LANGUAGE] = std::string(AI_DEFAULT_LANGUAGE);
 
     mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);
 };
@@ -78,7 +83,7 @@ void FSAIChatMgr::startupAIChat()
 {  // Called at viewer startup time
     std::string use_saved_name;
     loadAvatarAISettings(use_saved_name);   // Use the service name saved in the config file
-    if (mAIConfig[AI_CHAT_ON].asBoolean() && !mAIConfig[AI_SERVICE].asStringRef().empty())
+    if (mAIConfig[AI_FEATURES_ON].asBoolean() && !mAIConfig[AI_SERVICE].asStringRef().empty())
     {
         createAIService(mAIConfig[AI_SERVICE].asStringRef());
     }
@@ -128,7 +133,7 @@ void FSAIChatMgr::loadAvatarAISettings(const std::string& use_service)
 
         mAIConfig = LLSD::emptyMap();
         mAIConfig[AI_SERVICE] = new_service;
-        mAIConfig[AI_CHAT_ON] = (full_data.has(AI_CHAT_ON) && full_data.get(AI_CHAT_ON).asBoolean());
+        mAIConfig[AI_FEATURES_ON] = (full_data.has(AI_FEATURES_ON) && full_data.get(AI_FEATURES_ON).asBoolean());
 
         for (LLSD::map_const_iterator it = full_data.beginMap(); it != full_data.endMap(); ++it)
         {
@@ -140,6 +145,15 @@ void FSAIChatMgr::loadAvatarAISettings(const std::string& use_service)
                 {
                     mAIConfig[config_it->first] = config_it->second;
                     LL_DEBUGS("AIChat") << " setting '" << config_it->first << "' is " << config_it->second.asString() << LL_ENDL;
+                }
+
+                if (!mAIConfig.has(AI_LLM_MODE))
+                {
+                    mAIConfig[AI_LLM_MODE] = std::string(AI_DEFAULT_MODE);
+                }
+                if (!mAIConfig.has(AI_TARGET_LANGUAGE))
+                {
+                    mAIConfig[AI_TARGET_LANGUAGE] = std::string(AI_DEFAULT_LANGUAGE);
                 }
                 break;
             }
@@ -169,7 +183,7 @@ void FSAIChatMgr::saveAvatarAISettings()
     // Copy service specific values into the config
     for (LLSD::map_const_iterator config_it = mAIConfig.beginMap(); config_it != mAIConfig.endMap(); ++config_it)
     {
-        if (config_it->first != AI_CHAT_ON && config_it->first != AI_SERVICE)
+        if (config_it->first != AI_FEATURES_ON && config_it->first != AI_SERVICE)
         {   // to do - extend service class to maintain its own config data
             full_config[service_name][config_it->first] = config_it->second;
         }
@@ -177,7 +191,7 @@ void FSAIChatMgr::saveAvatarAISettings()
 
     // Save the current service name and on state
     full_config[AI_SERVICE] = service_name;
-    full_config[AI_CHAT_ON] = mAIConfig[AI_CHAT_ON];
+    full_config[AI_FEATURES_ON] = mAIConfig[AI_FEATURES_ON];
 
     // Write it out to a file
     const std::string filename = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, AVATAR_AI_SETTINGS_FILENAME);
@@ -189,7 +203,7 @@ void FSAIChatMgr::saveAvatarAISettings()
         return;
     }
 
-    LL_DEBUGS("AIChat") << "Writing avatar AI configuration to " << filename << ": " << mAIConfig << LL_ENDL;
+    LL_DEBUGS("AIChat") << "Writing avatar's AI configuration to " << filename << ": " << mAIConfig << LL_ENDL;
     LLSDSerialize::toPrettyXML(full_config, file);
     file.close();
 }
@@ -216,9 +230,9 @@ bool FSAIChatMgr::setAIConfigValues(LLSD& ai_config)
         changed = true;
     }
 
-    if (mAIConfig[AI_CHAT_ON].asBoolean() != ai_config.get(AI_CHAT_ON).asBoolean())
+    if (mAIConfig[AI_FEATURES_ON].asBoolean() != ai_config.get(AI_FEATURES_ON).asBoolean())
     {
-        mAIConfig[AI_CHAT_ON] = ai_config.get(AI_CHAT_ON);
+        mAIConfig[AI_FEATURES_ON] = ai_config.get(AI_FEATURES_ON);
         changed = true;
     }
 
@@ -234,7 +248,7 @@ bool FSAIChatMgr::setAIConfigValues(LLSD& ai_config)
 }
 
 
-void FSAIChatMgr::switchAIConfig(const std::string& service_name)
+void FSAIChatMgr::switchAIService(const std::string& service_name)
 {   // Switch to different service, loading those config values from file
     loadAvatarAISettings(service_name);
 
@@ -272,9 +286,22 @@ void FSAIChatMgr::createAIService(const std::string& ai_service_name)
 }
 
 
+void FSAIChatMgr::switchAIMode(const std::string& mode)
+{   // Switch to different mode
+    LL_DEBUGS("AIChat") << "Switch to AI mode " << mode << LL_ENDL;
+    mAIConfig[AI_LLM_MODE] = mode;
+}
+
+void FSAIChatMgr::switchAILanguage(const std::string& langauge)
+{   // Switch to different translation target language
+    LL_DEBUGS("AIChat") << "Switch to AI translation to " << langauge << LL_ENDL;
+    mAIConfig[AI_TARGET_LANGUAGE] = langauge;
+}
+
+
 void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& message, const std::string& name, const LLUUID& sessionid)
 {
-    if (mAIConfig.get(AI_CHAT_ON).asBoolean())
+    if (mAIConfig.get(AI_FEATURES_ON).asBoolean())
     {
         LL_DEBUGS("AIChat") << "Handling IM chat from " << from_id << " name " << name << ", session " << sessionid << ", text: " << message
                            << LL_ENDL;
@@ -310,6 +337,21 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
             }
 
             mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);    // Reset dead chat timer
+
+            // Send translation warning if needed
+            if (mAIMode == AI_MODE_TRANSLATE && !mTranslateWarningSent)
+            {
+                // Send warning about AI from strings.xml
+                std::string xlate_warning;
+                if (!LLTrans::findString(xlate_warning, std::string(AI_TRANSLATE_WARNING)))
+                {
+                    LL_WARNS("AIChat") << "Translation warning message not found, using default" << LL_ENDL;
+                    xlate_warning = "I am using an external AI to translate our chat.  Please ask me about it if you have questions";
+                }
+                LL_DEBUGS("AIChat") << "Sending translation warning message: " << xlate_warning << LL_ENDL;
+                LLIMModel::sendMessage(xlate_warning, mChatSession, mChattyAgent, IM_NOTHING_SPECIAL);
+                mTranslateWarningSent = true;
+            }
 
             FSFloaterAIChat* floater = FSFloaterAIChat::getAIChatFloater();
             if (floater)
@@ -352,11 +394,58 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
         }
     }
     else
-    {   // AI chst is off
-        LL_INFOS("AIChat") << "AI chat is off" << LL_ENDL;
+    {   // AI chat is off
+        LL_DEBUGS("AIChat") << "AI chat is off" << LL_ENDL;
     }
 }
 
+
+void FSAIChatMgr::processOutgoingChat(const std::string& utf8_text, const LLUUID& im_session_id, const LLUUID& other_participant_id)
+{
+    if (mAIConfig.get(AI_FEATURES_ON).asBoolean() && mAIMode == AI_MODE_TRANSLATE)
+    {
+        if (mLastChatTimer.hasExpired() && mChatSession.notNull() && (mChatSession != im_session_id))
+        { // Conversation went dead, reset for new incoming chat
+            resetChat();
+        }
+        if (mChatSession.isNull() && mAIService)
+        {   // Start a new chat
+            // to do - check if ID is on allow list, etc - have some sort of access control?
+            mChatSession = im_session_id; // Save info
+            mChattyAgent = other_participant_id;
+        }
+
+        if (mChatSession.notNull() &&
+            mChatSession == im_session_id &&
+            mChattyAgent == other_participant_id &&
+            !mLastLanguageCode.empty())
+        {
+            std::string translate_back("translate to ");
+            translate_back.append(mLastLanguageCode);
+            translate_back.append(": ");
+            translate_back.append(utf8_text);
+
+            if (mAIService)
+            {   // Send outgoing message to external AI chat service for translation
+                LL_INFOS("AIChat") << "Sending chat from this avatar for translation to " << mAIService->getName() << " AI service" << LL_ENDL;
+                mAIService->sendChatToAIService(translate_back, false);
+                //if (mAIService->saveChatHistory())  to do - sort out history.   This is a 3rd person in the chat, not sure how it fits
+                //{ // Most recent goes on the back
+                //    mAIChatHistory.push_back({ translate_back, (char*)AI_HISTORY_USER });
+                //    trimAIChatHistoryData();
+                //}
+            }
+            else
+            {
+                LL_WARNS("AIChat") << "No AI service available, unable to send chat for translation" << LL_ENDL;
+            }
+        }
+    }
+    else
+    { // AI chat is off
+        LL_DEBUGS("AIChat") << "No match or AI chat is off for outgoing translation" << LL_ENDL;
+    }
+}
 
 void FSAIChatMgr::sendChatToAIService(const std::string& message, bool request_direct)
 {  // Simple glue
@@ -374,7 +463,9 @@ void FSAIChatMgr::resetChat()
     mChattyAgent.setNull();  // Other agent
     mChattyDisplayName.clear();
     mAIChatHistory.clear();
+    mLastLanguageCode.clear();
     mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);
+    mTranslateWarningSent = false;
 
     FSFloaterAIChat* floater = FSFloaterAIChat::getAIChatFloater();
     if (floater)
@@ -415,6 +506,11 @@ void FSAIChatMgr::processIncomingAIResponse(const std::string& untrimmed_ai_mess
 {   // Just save message data - called from coroutine
     std::string ai_message(untrimmed_ai_message);
     LLStringUtil::trim(ai_message);
+    if (mAIMode == AI_MODE_TRANSLATE && ai_message == "No translation")
+    {
+        LL_WARNS("AIChat") << "Dropping 'No translation' message from AI" << LL_ENDL;
+        return;
+    }
     if (mAIReplyQueue.size() < AI_REPLY_QUEUE_LIMIT)
     {
         mAIReplyQueue.push({ ai_message, request_direct });  // Push on the back.
@@ -464,6 +560,13 @@ void FSAIChatMgr::finallyProcessIncomingAIResponse(const std::string& ai_message
     else
     {
         LL_WARNS("AIChat") << "Unable to get AI chat floater" << LL_ENDL;
+    }
+
+    if (mAIMode == AI_MODE_TRANSLATE &&
+        (ai_message.length() > 5 && ai_message.at(2) == '-' && ai_message.at(5) == ':'))
+    {   // Cheap check for fr-en: ISO 639-1 format at start.  To do: support ISO 639-2 or -3 someday
+        mLastLanguageCode = ai_message.substr(0,2); // Last language used by other agent when translating
+        LL_DEBUGS("AIChat") << "mLastLanguageCode set to " << mLastLanguageCode << LL_ENDL;
     }
 
     if (!request_direct)

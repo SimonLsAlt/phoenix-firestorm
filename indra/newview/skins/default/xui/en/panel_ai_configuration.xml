@@ -28,11 +28,11 @@
     <check_box
      follows="top"
      height="23"
-     label="Enable AI-based chat service:  "
+     label="Enable AI-based service"
      layout="topleft"
      left="20"
-     name="chat_on"
-     tool_tip="Checking this box will use an AI service for IM chat"
+     name="ai_features_on"
+     tool_tip="Checking this box will use an AI service for IM chat or translation"
      top_delta="32"
      width="182" />
 
@@ -90,7 +90,105 @@
      length="1"
      font="SansSerif"
      follows="top"
-     top_pad="-350"
+     top_pad="-340"
+     height="23"
+     layout="topleft"
+     left="20"
+     name="mode_prompt"
+     width="120">
+        AI Chat Mode:
+    </text>
+
+    <combo_box
+     enabled="true"
+     height="23"
+     follows="left|top"
+     left_pad="10"
+     name="llm_mode"
+     visible="true"
+     width="180">
+        <combo_box.item
+         label="Character chat"
+         name="character_chat"
+         value="character_chat" />
+        <combo_box.item
+         label="Shared Translator"
+         name="share_xlate"
+         value="share_xlate" />
+        <combo_box.item
+         label="Private Translator"
+         name="private_xlate"
+         value="private_xlate" />
+    </combo_box>
+
+    <combo_box
+     enabled="true"
+     height="23"
+     follows="left|top"
+     left_pad="10"
+     name="target_language"
+     visible="true"
+     width="110">
+        <combo_box.item
+         label="Dansk"
+         name="danish"
+         value="da" />
+        <combo_box.item
+         label="Deutsch"
+         name="german"
+         value="de" />
+        <combo_box.item
+         label="English"
+         name="english"
+         value="en" />
+        <combo_box.item
+         label="Español"
+         name="spanish"
+         value="es" />
+        <combo_box.item
+         label="Français"
+         name="french"
+         value="fr" />
+        <combo_box.item
+         label="Italian"
+         name="italian"
+         value="it" />
+        <combo_box.item
+         label="日本語"
+         name="japanese"
+         value="ja" />
+        <combo_box.item
+         label="한국어"
+         name="korean"
+         value="ko" />
+        <combo_box.item
+         label="Português"
+         name="portuguese"
+         value="pt" />
+        <combo_box.item
+         label="Русский (Russkiy)"
+         name="russian"
+         value="ru" />
+        <combo_box.item
+         label="Türkçe"
+         name="turkish"
+         value="tr" />
+        <combo_box.item
+         label="اردو (Urdu)"
+         name="urdu"
+         value="pk" />
+        <combo_box.item
+         label="中文 / 汉语 (Chinese)"
+         name="chinese"
+         value="zh" />
+    </combo_box>
+
+    <text
+     type="string"
+     length="1"
+     font="SansSerif"
+     follows="top"
+     top_pad="12"
      height="23"
      layout="topleft"
      left="20"
@@ -108,7 +206,7 @@
      layout="topleft"
      max_length_bytes="1024"
      name="endpoint"
-     width="320" />
+     width="300" />
 
     <text
      type="string"
@@ -133,7 +231,7 @@
      layout="topleft"
      max_length_bytes="256"
      name="api_key"
-     width="320" />
+     width="300" />
 
     <text
      type="string"
@@ -158,7 +256,7 @@
      layout="topleft"
      max_length_bytes="256"
      name="character_id"
-     width="320" />
+     width="300" />
 
     <text
      type="string"
@@ -183,7 +281,7 @@
      layout="topleft"
      max_length_bytes="256"
      name="model"
-     width="320" />
+     width="300" />
 
     <button
      enabled="true"
@@ -196,4 +294,5 @@
      name="apply_btn"
      width="108">
     </button>
-  </panel>
+
+</panel>

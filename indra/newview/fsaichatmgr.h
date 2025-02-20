@@ -64,8 +64,10 @@ public:
     const LLUUID&   getChatSession() const { return mChatSession; };
 
     bool            setAIConfigValues(LLSD & ai_config);    // Supports some subset of config value changes
-    void            switchAIConfig(const std::string& service_name);        // Switch to different service, load those config values
     const LLSD&     getAIConfig() const         { return mAIConfig;  }
+    void            switchAIService(const std::string& service_name);   // Switch to different service, load those config values
+    void            switchAIMode(const std::string& mode);              // Switch to different mode, ie. chat vs. translator
+    void            switchAILanguage(const std::string& langauge);      // Switch to different translation target language
 
     void            loadAvatarAISettings(const std::string & use_service);
     void            saveAvatarAISettings();
@@ -75,6 +77,14 @@ public:
 
     const std::string& getChattyDisplayName() const                  { return mChattyDisplayName; };
     void               setChattyDisplayName(const std::string& name) { mChattyDisplayName = name; };
+
+    typedef enum
+    {
+        AI_MODE_CHAT      = 0, // AI as chat bot
+        AI_MODE_TRANSLATE = 1  // AI as translator
+    } FSAIMode;
+    FSAIMode getAIMode() const            { return mAIMode; };
+    void       setAIMode(FSAIMode mode)   { mAIMode = mode; };
 
     void            idle();     // Regularly called from main loop
 
@@ -89,6 +99,10 @@ public:
 
     void            resetChat();
 
+    void            processOutgoingChat(const std::string& utf8_text,
+                             const LLUUID&      im_session_id,
+                             const LLUUID&      other_participant_id);
+
     const ai_chat_history_t& getAIChatHistory() const { return mAIChatHistory; };
 
   private:
@@ -100,6 +114,13 @@ public:
     LLUUID          mChatSession;        // Chat session id
     LLUUID          mChattyAgent;        // Other agent
     std::string     mChattyDisplayName;  // Name of other agent to use in conversation
+
+    std::string     mLastLanguageCode;   // Last language used by other agent when translating
+
+    // to do - combine mAIMode with config AI_FEATURES_ON when the UI gets sorted out
+    FSAIMode mAIMode;               // True if doing translations
+    bool mTranslateWarningSent;     // True if warning about translation has been sent
+
 
     FSAIService*      mAIService;        // Interface to external AI chat service
     LLSD              mAIConfig;         // Configuration values for AI back end
