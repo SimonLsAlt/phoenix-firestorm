@@ -551,9 +551,12 @@ public:
         static LLCachedControl<bool> debugShowMemory(gSavedSettings, "DebugShowMemory");
         if (debugShowMemory)
         {
+            auto rss = LLMemory::getCurrentRSS() / 1024;
             addText(xpos, ypos,
-                    STRINGIZE("Memory: " << (LLMemory::getCurrentRSS() / 1024) << " (KB)"));
+                    STRINGIZE("Memory: " << rss << " (KB)"));
             ypos += y_inc;
+            LL_PROFILE_PLOT("RSS", (int64_t)rss );
+            LL_PROFILE_PLOT("GL:", (int64_t)LLRenderTarget::sBytesAllocated );
         }
 
         if (gDisplayCameraPos)
@@ -1836,10 +1839,22 @@ bool LLViewerWindow::handleTimerEvent(LLWindow *window)
     return false;
 }
 
-bool LLViewerWindow::handleDeviceChange(LLWindow *window)
+// <FS:Dax> [FIRE-10419] Added deviceRemoved bool to prevent reinitialize on disconnect.
+// bool LLViewerWindow::handleDeviceChange(LLWindow* window)
+// {
+//     if (!LLViewerJoystick::getInstance()->isJoystickInitialized())
+//     {
+//         LLViewerJoystick::getInstance()->init(true);
+//         return true;
+//     }
+//     return false;
+// }
+// </FS>
+
+bool LLViewerWindow::handleDeviceChange(LLWindow *window, bool deviceRemoved) 
 {
     // give a chance to use a joystick after startup (hot-plugging)
-    if (!LLViewerJoystick::getInstance()->isJoystickInitialized() )
+    if (!deviceRemoved && !LLViewerJoystick::getInstance()->isJoystickInitialized())
     {
         LLViewerJoystick::getInstance()->init(true);
         return true;

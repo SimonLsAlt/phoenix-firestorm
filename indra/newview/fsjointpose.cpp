@@ -29,12 +29,15 @@
 #include "fsposingmotion.h"
 #include "llcharacter.h"
 
+/// <summary>
+/// The maximum length of any undo queue; adding new members preens older ones.
+/// </summary>
 constexpr size_t MaximumUndoQueueLength = 20;
 
 /// <summary>
 /// The constant time interval, in seconds, specifying whether an 'undo' value should be added.
 /// </summary>
-constexpr std::chrono::duration<double> UndoUpdateInterval = std::chrono::duration<double>(0.3);
+constexpr std::chrono::duration<double> UndoUpdateInterval = std::chrono::duration<double>(0.8);
 
 FSJointPose::FSJointPose(LLJoint* joint, U32 usage, bool isCollisionVolume)
 {
@@ -166,38 +169,35 @@ void FSJointPose::swapRotationWith(FSJointPose* oppositeJoint)
     if (mIsCollisionVolume)
         return;
 
-    LLJoint* joint = mJointState->getJoint();
-    if (!joint)
-        return;
-
-    auto tempRot = FSJointRotation(mRotation);
-    mRotation    = FSJointRotation(oppositeJoint->mRotation);
+    auto tempRot             = FSJointRotation(mRotation);
+    mRotation                = FSJointRotation(oppositeJoint->mRotation);
     oppositeJoint->mRotation = tempRot;
 }
 
-void FSJointPose::revertJointScale()
+void FSJointPose::cloneRotationFrom(FSJointPose* fromJoint)
 {
-    LLJoint* joint = mJointState->getJoint();
-    if (!joint)
+    if (!fromJoint)
         return;
 
-    joint->setScale(mBeginningScale);
+    addToUndo(mRotation, &mUndoneRotationIndex, &mLastSetRotationDeltas, &mTimeLastUpdatedRotation);
+    mRotation = FSJointRotation(fromJoint->mRotation);
 }
 
-void FSJointPose::revertJointPosition()
+void FSJointPose::mirrorRotationFrom(FSJointPose* fromJoint)
 {
-    LLJoint* joint = mJointState->getJoint();
-    if (!joint)
+    if (!fromJoint)
         return;
 
-    joint->setPosition(mBeginningPosition);
+    cloneRotationFrom(fromJoint);
+
+    mRotation.baseRotation = LLQuaternion(-mRotation.baseRotation.mQ[VX], mRotation.baseRotation.mQ[VY], -mRotation.baseRotation.mQ[VZ],
+                                          mRotation.baseRotation.mQ[VW]);
+    mRotation.deltaRotation = LLQuaternion(-mRotation.deltaRotation.mQ[VX], mRotation.deltaRotation.mQ[VY], -mRotation.deltaRotation.mQ[VZ],
+                                           mRotation.deltaRotation.mQ[VW]);
 }
 
-void FSJointPose::revertCollisionVolume()
+void FSJointPose::revertJoint()
 {
-    if (!mIsCollisionVolume)
-        return;
-
     LLJoint* joint = mJointState->getJoint();
     if (!joint)
         return;

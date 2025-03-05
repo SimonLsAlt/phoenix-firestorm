@@ -1521,7 +1521,7 @@
 新顯示卡：„[THIS_GPU]「
 	</notification>
 	<notification name="DisplaySetToRecommendedFeatureChange">
-		由於渲染子系統有所變更，已將顯示設定設為推薦的設定。
+		由於彩現子系統有所變更，已將顯示設定設為推薦的設定。
 	</notification>
 	<notification name="ErrorMessage">
 		[ERROR_MESSAGE]
@@ -1686,7 +1686,7 @@ SHA1指紋：[MD5_DIGEST]
 
 如果紋理 [TEXTURE_NUM] 是不透明的,請等待紋理完全載入後再次點擊"應用"。
 
-透明度僅在地形材質(PBR金屬粗糙度)中支援,且要求 alphaMode="MASK" 和 doubleSided=false。
+不透明度僅在地形材質(PBR金屬粗糙度)中支援,且要求 alphaMode="MASK" 和 doubleSided=false。
 	</notification>
 	<notification name="InvalidTerrainAlpha">
 無法設定區域紋理:
@@ -1694,7 +1694,7 @@ SHA1指紋：[MD5_DIGEST]
 
 請將紋理 [TEXTURE_NUM] 替換為不透明的RGB圖像,然後再次點擊"應用"。
 
-透明度僅在地形材質(PBR金屬粗糙度)中支援,且要求 alphaMode="MASK" 和 doubleSided=false。
+不透明度僅在地形材質(PBR金屬粗糙度)中支援,且要求 alphaMode="MASK" 和 doubleSided=false。
 	</notification>
 	<notification name="InvalidTerrainMaterialNotLoaded">
 無法設定區域材質:
@@ -1828,6 +1828,8 @@ SHA1指紋：[MD5_DIGEST]
 	</notification>
 	<notification name="WebLaunchExternalTarget">
 		你確定要開啟網頁瀏覽器去檢視這個內容？
+開啟來歷不明的網頁可能會危及您的電腦。
+URL:[UNTRUSTED_URL]
 		<usetemplate ignoretext="啟用我的網頁瀏覽器去檢視網頁" name="okcancelignore" notext="取消" yestext="確定"/>
 	</notification>
 	<notification name="WebLaunchJoinNow">
@@ -2799,7 +2801,7 @@ SHA1指紋：[MD5_DIGEST]
 		<usetemplate name="okbutton" yestext="確定"/>
 	</notification>
 	<notification name="DayCycleTooManyKeyframes">
-		你無法新增更多的關鍵幀到這個日循環。  [SCOPE] 範圍的日循環最多允許 [MAX] 個關鍵幀。
+		你無法新增更多的關鍵影格到這個日循環。  [SCOPE] 範圍的日循環最多允許 [MAX] 個關鍵影格。
 		<usetemplate name="okbutton" yestext="確定"/>
 	</notification>
 	<notification name="EnvUpdateRate">
@@ -3632,12 +3634,12 @@ URL：[AUDIOURL]
 請按 M 鍵做切換。
 	</notification>
 	<notification name="FirstSandbox">
-		這個一個沙盤區，旨在幫助居民學習如何建造物件。
+		這是一個沙盤區，旨在幫助居民學習如何建造物件。
 
 你在這裡建造的物件，在你離開後將被刪除。別忘了按滑鼠右鍵，選擇「拿取」，將你的建造物送到你的庫存。
 	</notification>
 	<notification name="MaxListSelectMessage">
-		你最多隻能從這清單中選擇 [MAX_SELECT] 個物件。
+		你最多隻能從這個清單中選擇 [MAX_SELECT] 個物件。
 	</notification>
 	<notification name="VoiceInviteP2P">
 		[NAME] 正邀請你加入語音聊天。
@@ -3655,7 +3657,7 @@ URL：[AUDIOURL]
 		[NAME] 已收到錢，並已被自動解除封鎖。
 	</notification>
 	<notification name="AutoUnmuteByInventory">
-		[NAME] 已得知你要贈送收納物件，並已被自動解除封鎖。
+		[NAME] 已得知你要贈送庫存物件，並已被自動解除封鎖。
 	</notification>
 	<notification name="VoiceInviteGroup">
 		[NAME] 已加入和群組 [GROUP] 的語音聊天通話。
@@ -3786,7 +3788,7 @@ URL：[AUDIOURL]
 		儲存預設名稱[NAME]時出錯。
 	</notification>
 	<notification name="DefaultPresetNotSaved">
-		無法涵蓋預先設定。
+		無法覆蓋預先設定。
 	</notification>
 	<notification name="PresetAlreadyExists">
 		「[NAME]」已經被使用。您可以覆蓋這個預設
@@ -4054,7 +4056,7 @@ https://wiki.firestormviewer.org/fs_voice
 	<notification label="說話" name="HintSpeak">
 		點擊「說話」按鈕來打開或關閉麥克風。
 
-點擊向上箭頭鍵，可顯示聲音控制檯。
+點擊向上箭頭鍵，可顯示聲音控制台。
 
 隱藏「說話」按鈕將停用語音功能。
 	</notification>
@@ -4254,8 +4256,8 @@ https://wiki.firestormviewer.org/fs_voice
 		<usetemplate ignoretext="所選的一些聯結集的幻影旗標將被切換，其他則因許可權不足且形狀屬於非凸面，因此無法設定。" name="okcancelignore" notext="取消" yestext="確定"/>
 	</notification>
 	<notification name="PathfindingLinksets_ChangeToFlexiblePath">
-		所選的物件會影響導航格線。  將它改為彈性路徑，將使它從導航格線中被移除。
-		<usetemplate ignoretext="所選的物件會影響導航格線。  將它改為彈性路徑，將使它從導航格線中被移除。" name="okcancelignore" notext="取消" yestext="確定"/>
+		所選的物件會影響導航網格。  將它改為彈性路徑，將使它從導航網格中被移除。
+		<usetemplate ignoretext="所選的物件會影響導航網格。  將它改為彈性路徑，將使它從導航網格中被移除。" name="okcancelignore" notext="取消" yestext="確定"/>
 	</notification>
 	<global name="UnsupportedCPUAmount">
 		796
@@ -4324,10 +4326,10 @@ https://wiki.firestormviewer.org/fs_voice
 		<usetemplate name="okcancelbuttons" notext="取消" yestext="刪除"/>
 	</notification>
 	<notification name="AOForeignItemsFound">
-		在動畫涵蓋中發現了不屬於設定的物件。請檢查「失物招領」檔案夾中是否有從動畫涵蓋設定中移除的物件。
+		在動畫覆蓋中發現了不屬於設定的物件。請檢查「失物招領」檔案夾中是否有從動畫覆蓋設定中移除的物件。
 	</notification>
 	<notification name="AOImportComplete">
-		動畫涵蓋通知匯入完成！
+		動畫覆蓋通知匯入完成！
 	</notification>
 	<notification name="AOImportSetAlreadyExists">
 		已經存在同名的動畫集。
@@ -4883,7 +4885,7 @@ switch語句在沒有預設標籤情況下的行為不正確已被修正。
 		無法建立要求的物件。 區域已滿載。
 	</notification>
 	<notification name="CantCreateAnimatedObjectTooLarge">
-		無法建立所求的動畫物件，因為超過架設三角形的限制。
+		無法建立所求的動畫物件，因為超過已綁定三角形的限制。
 	</notification>
 	<notification name="CantAttackMultipleObjOneSpot">
 		你不能將多個物件附著到同一個點。
@@ -4937,10 +4939,10 @@ switch語句在沒有預設標籤情況下的行為不正確已被修正。
 		操作會導致附著的動畫物件數目超過限制。
 	</notification>
 	<notification name="NoPermsLinkAnimatedObjectTooLarge">
-		無法聯結這些物件，因為聯結後的動畫物件會超過架設三角形的限制。
+		無法聯結這些物件，因為聯結後的動畫物件會超過已綁定三角形的限制。
 	</notification>
 	<notification name="NoPermsSetFlagAnimatedObjectTooLarge">
-		無法使這物件變為動畫物件，因為會超過架設三角形的限制。
+		無法使這物件變為動畫物件，因為會超過已綁定三角形的限制。
 	</notification>
 	<notification name="CantChangeAnimatedObjectStateInsufficientLand">
 		無法改變這一物件的動畫物件狀態，因為會超過地塊的限制。
@@ -5625,12 +5627,12 @@ gzip級別6壓縮的測試結果，對[FILE]檔案大小[SIZE] KB：
 		<usetemplate name="okbutton" yestext="確定"/>
 	</notification>
 	<notification name="RiggedMeshAttachedToHUD">
-		一個名為「[NAME]」的物件，附著到HUD附著點「[POINT]」，包含繫結網格模型。
+		一個名為「[NAME]」的物件，附著到HUD附著點「[POINT]」，包含已綁定的網格模型。
 
-繫結格線物件是爲了附著到化身上的。您自己和其他人都看不到它。
+已綁定的網格物件是爲了附著到化身上的。您自己和其他人都看不到它。
 
 如果您想要看到這個物件，請取下它並將其附著到化身附著點上。
-		<usetemplate ignoretext="警告，如果繫結網格模型附著到HUD附著點上。" name="okignore" yestext="確定"/>
+		<usetemplate ignoretext="警告，如果已綁定的網格模型附著到HUD附著點上。" name="okignore" yestext="確定"/>
 	</notification>
 以下是程式碼中文字的翻譯：
 
@@ -5687,7 +5689,7 @@ gzip級別6壓縮的測試結果，對[FILE]檔案大小[SIZE] KB：
 		<usetemplate name="okbutton" yestext="確定"/>
 	</notification>
 	<notification name="EnableAutoFPSWarning">
-		你即將啟用自動幀率。所有未儲存的圖形設定將會丟失。
+		你即將啟用自動影格率。所有未儲存的圖形設定將會丟失。
 
 你想先儲存它們嗎？
 		<usetemplate name="okcancelbuttons" notext="否" yestext="是"/>
@@ -5723,7 +5725,7 @@ gzip級別6壓縮的測試結果，對[FILE]檔案大小[SIZE] KB：
 		<usetemplate name="okcancelbuttons" notext="取消" yestext="好的"/>
 	</notification>
 	<notification label="紋理包含空的 Alpha 通道" name="ImageEmptyAlphaLayer">
-您要上傳的紋理包含一個空的或幾乎為空的 Alpha 通道（透明度資訊）。 這應該總是不正確的，應該移除該通道。新增 Alpha 通道可能會導致重疊紋理在不同相機角度下閃爍。 此外，它還會降低渲染速度。除非這個紋理確實需要一個（幾乎）空的 Alpha 通道，否則應該儘可能地移除它。
+您要上傳的紋理包含一個空的或幾乎為空的 Alpha 通道（透明度資訊）。 這應該總是不正確的，應該移除該通道。新增 Alpha 通道可能會導致重疊紋理在不同相機角度下閃爍。 此外，它還會降低彩現速度。除非這個紋理確實需要一個（幾乎）空的 Alpha 通道，否則應該儘可能地移除它。
 		<form name="form">
 			<button name="strip" text="刪除 Alpha"/>
 			<button name="use_as_is" text="按原樣使用"/>

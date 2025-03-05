@@ -148,25 +148,25 @@ class FSJointPose
     void swapRotationWith(FSJointPose* oppositeJoint);
 
     /// <summary>
+    /// Clones the rotation to this from the supplied joint.
+    /// </summary>
+    void cloneRotationFrom(FSJointPose* fromJoint);
+
+    /// <summary>
+    /// Mirrors the rotation to this from the supplied joint.
+    /// </summary>
+    void mirrorRotationFrom(FSJointPose* fromJoint);
+
+    /// <summary>
     /// Resets the beginning properties of the joint this represents.
     /// </summary>
     void recaptureJoint();
 
     /// <summary>
-    /// Restores the joint represented by this to the scale it had when this motion started.
+    /// Reverts the position/rotation/scale to their values when the animation begun.
+    /// This treatment is required for certain joints, particularly Collision Volumes and those bones not commonly animated by an AO.
     /// </summary>
-    void revertJointScale();
-
-    /// <summary>
-    /// Restores the joint represented by this to the position it had when this motion started.
-    /// </summary>
-    void revertJointPosition();
-
-    /// <summary>
-    /// Collision Volumes do not 'reset' their position/rotation when the animation stops.
-    /// This requires special treatment to revert changes we've made this animation session.
-    /// </summary>
-    void revertCollisionVolume();
+    void revertJoint();
 
     LLVector3 getTargetPosition() const { return mPositionDelta + mBeginningPosition; }
     LLQuaternion getTargetRotation() const { return mRotation.getTargetRotation(); }

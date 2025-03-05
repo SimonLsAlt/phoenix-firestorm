@@ -107,6 +107,7 @@
 		<menu_item_check name="Conversation Log..." label="Журнал разговоров..."/>
 		<menu_item_check label="Ближайшие голоса" name="Nearby Voice"/>
 		<menu_item_call label="Список заблокированных" name="Block List"/>
+		<menu_item_check label="Показать экранную консоль чата" name="Show On-screen Console"/>
 	</menu>
 
 	<!-- World Menu -->
@@ -192,6 +193,7 @@
 			<menu_item_call label="Инструменты фото" name="phototools_item_call"/>
 			<menu_item_call label="Инструменты камеры" name="cameratools_item_call"/>
 			<menu_item_check label="Блокировка фокуса Глубины резкости" name="lock_focus_point"/>
+			<menu_item_check label="Рисовать перекрестие фокуса Глубины резкости" name="render_focus_point"/>
 		</menu>
 		<menu_item_call label="Поиск вокруг" name="area_search"/>
 		<menu_item_call label="Проводник звуков" name="Sound Explorer"/>

@@ -492,7 +492,7 @@ support@secondlife.com.
 		變暗
 	</string>
 	<string name="Edges">
-		邊緣發光
+		邊緣光暈
 	</string>
 	<string name="Focus">
 		中心對焦
@@ -2016,8 +2016,8 @@ support@secondlife.com.
 	<string name="PermNo">
 		否
 	</string>
-	<!-- 手勢標籤 -->
-	<!-- 因為前面有空格所以使用 value="" -->
+	<!-- inventory filter -->
+	<!-- use value="" because they have preceding spaces -->
 	<string name="Chat Message" value=" 聊天訊息 : " />
 	<string name="Sound" value=" 聲音 : " />
 	<string name="Wait" value=" --- 等待 : " />
@@ -2028,8 +2028,8 @@ support@secondlife.com.
 	<string name="HelloAvatar" value=" 你好, 居民! " />
 	<string name="ViewAllGestures" value="  檢視所有 &gt;&gt;" />
 	<string name="GetMoreGestures" value="  取得更多 &gt;&gt;" />
-	<!-- 物件欄過濾器 -->
-	<!-- 因為前面有空格所以使用 value="" -->
+	<!-- inventory filter -->
+	<!-- use value="" because they have preceding spaces -->
 	<string name="Animations" value=" 動畫," />
 	<string name="Calling Cards" value=" 名片," />
 	<string name="Clothing" value=" 服裝," />
@@ -2043,9 +2043,10 @@ support@secondlife.com.
 	<string name="Textures" value=" 紋理," />
 	<string name="Settings" value=" 環境設定," />
 	<string name="Snapshots" value=" 快照," />
+	<string name="Folders" value=" 檔案夾," />
 	<string name="No Filters" value="無過濾器 " />
 	<string name="Since Logoff" value=" - 自上次登出之後" />
-	<!-- <FS:Zi> FIRE-1175 - 過濾許可權菜單 -->
+	<!-- <FS:Zi> FIRE-1175 - Filter Permissions Menu -->
 	<string name="Modifiable" value="可修改" />
 	<string name="Copyable" value="可複製" />
 	<string name="Transferable" value="可轉讓" />
@@ -6192,7 +6193,7 @@ support@secondlife.com.
 		快速存取
 	</string>
 	<string name="Command_AO_Label">
-		動畫涵蓋
+		動畫覆蓋
 	</string>
 	<string name="Command_Webbrowser_Label">
 		Web瀏覽器
@@ -6382,7 +6383,7 @@ support@secondlife.com.
 		快速更改常用首選設定
 	</string>
 	<string name="Command_AO_Tooltip">
-		動畫涵蓋
+		動畫覆蓋
 	</string>
 	<string name="Command_Webbrowser_Tooltip">
 		打開內部web瀏覽器 (CTRL+SHIFT+Z)
@@ -6463,7 +6464,7 @@ support@secondlife.com.
 		在檢視器中只顯示你的好友，其他化身都將被隱藏。一旦使用瞬間傳送就會恢復其他人的顯示。
 	</string>
 	<string name="Command_DAO_Tooltip">
-		取消動畫彩現（又名網格動畫）-臨時取消彩現當前所有可見（已使用或未使用）的動畫網格。瞬間傳送後自動恢復動畫網格。
+		取消動畫物件（Animesh）-臨時取消彩現當前所有可見（已附著或自由行動）的動畫物件。瞬間傳送後自動恢復動畫物件。
 	</string>
 	<string name="Command_Beacons_Tooltip">
 		顯示信標
@@ -6855,7 +6856,7 @@ SecondLife.com網站的「支援」部分
 	</string>
 	<string name="ssl_connect_error">
 這通常意味著你電腦的時鐘設定不正確。
-請轉到電腦「控制檯」，確保時間和日期設定正確。
+請轉到電腦「控制台」，確保時間和日期設定正確。
 並檢查你的網路和防火牆是否設定正確。
 如果你繼續收到此錯誤，請轉到
 SecondLife.com網站的「支援」部分
@@ -7052,10 +7053,10 @@ SecondLife.com網站的「支援」部分
 	</string>
 	<!-- <FS:Zi> Animation overrider enable/disable messages - FIRE-24160 -->
 	<string name="FSAOEnabled">
-		[APP_NAME] 動畫涵蓋器已啟用。
+		[APP_NAME] 動畫覆蓋器已啟用。
 	</string>
 	<string name="FSAODisabled">
-		[APP_NAME] 動畫涵蓋器已禁用。
+		[APP_NAME] 動畫覆蓋器已禁用。
 	</string>
 	<string name="FSAOPausedScript">
 		已被指令碼附件暫停。
@@ -7064,10 +7065,10 @@ SecondLife.com網站的「支援」部分
 		已被指令碼附件恢復。
 	</string>
 	<string name="FSAOStandsPausedScript">
-		常駐動畫涵蓋已被指令碼附件暫停。
+		常駐動畫覆蓋已被指令碼附件暫停。
 	</string>
 	<string name="FSAOStandsResumedScript">
-		常駐動畫涵蓋已被指令碼附件暫停。
+		常駐動畫覆蓋已被指令碼附件暫停。
 	</string>
 	<!-- <FS:Zi> Quick preferences default options -->
 	<string name="QP Draw Distance">
@@ -7213,10 +7214,10 @@ SecondLife.com網站的「支援」部分
 		[ERR_NAME] ([LINENUMBER]): 攔截到意料之外的異常。
 	</string>
 	<string name="fs_preprocessor_lsl2_directive_override">
-		檢測到 compile-as-LSL2 指令正在涵蓋偏好設定。
+		檢測到 compile-as-LSL2 指令正在覆蓋偏好設定。
 	</string>
 	<string name="fs_preprocessor_mono_directive_override">
-		檢測到 compile-as-Mono 指令正在涵蓋偏好設定。
+		檢測到 compile-as-Mono 指令正在覆蓋偏好設定。
 	</string>
 	<!-- LSL Optimizer -->
 	<string name="fs_preprocessor_optimizer_start">
