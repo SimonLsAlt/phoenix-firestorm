@@ -57,7 +57,6 @@ static constexpr S32 AI_REPLY_QUEUE_LIMIT = 10;
 // ----------------------------------------------------------------------------------------
 
 FSAIChatMgr::FSAIChatMgr() : mAIService(nullptr),
-                             mAIMode(AI_MODE_CHAT),
                              mTranslateWarningSent(false)
 {
     // Ensure values in case there is no saved settings file
@@ -68,7 +67,7 @@ FSAIChatMgr::FSAIChatMgr() : mAIService(nullptr),
     mAIConfig[AI_ENDPOINT]     = std::string();    // to do - break apart service specific config settings to live in service class
     mAIConfig[AI_API_KEY]      = std::string();
     mAIConfig[AI_CHARACTER_ID] = std::string();
-    mAIConfig[AI_LLM_MODE]        = std::string(AI_DEFAULT_MODE);
+    mAIConfig[AI_LLM_MODE]        = std::string(AI_MODE_CHAT);
     mAIConfig[AI_TARGET_LANGUAGE] = std::string(AI_DEFAULT_LANGUAGE);
 
     mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);
@@ -149,7 +148,7 @@ void FSAIChatMgr::loadAvatarAISettings(const std::string& use_service)
 
                 if (!mAIConfig.has(AI_LLM_MODE))
                 {
-                    mAIConfig[AI_LLM_MODE] = std::string(AI_DEFAULT_MODE);
+                    mAIConfig[AI_LLM_MODE] = std::string(AI_MODE_CHAT);
                 }
                 if (!mAIConfig.has(AI_TARGET_LANGUAGE))
                 {
@@ -299,6 +298,17 @@ void FSAIChatMgr::switchAILanguage(const std::string& langauge)
 }
 
 
+bool FSAIChatMgr::translationModeOn() const
+{   // Return true if doing language translation
+    return mAIConfig[AI_LLM_MODE].asString() != std::string(AI_MODE_CHAT);
+}
+
+bool FSAIChatMgr::localTranslationMode() const
+{ // Return true if doing language translation with local display only
+    return mAIConfig[AI_LLM_MODE].asString() == std::string(AI_MODE_XLATE_LOCAL);
+}
+
+
 void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& message, const std::string& name, const LLUUID& sessionid)
 {
     if (mAIConfig.get(AI_FEATURES_ON).asBoolean())
@@ -339,7 +349,7 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
             mLastChatTimer.resetWithExpiry(AI_CHAT_AFK_GIVEUP_SECS);    // Reset dead chat timer
 
             // Send translation warning if needed
-            if (mAIMode == AI_MODE_TRANSLATE && !mTranslateWarningSent)
+            if (translationModeOn() && !mTranslateWarningSent)
             {
                 // Send warning about AI from strings.xml
                 std::string xlate_warning;
@@ -402,8 +412,8 @@ void FSAIChatMgr::processIncomingChat(const LLUUID& from_id, const std::string& 
 
 void FSAIChatMgr::processOutgoingChat(const std::string& utf8_text, const LLUUID& im_session_id, const LLUUID& other_participant_id)
 {
-    if (mAIConfig.get(AI_FEATURES_ON).asBoolean() && mAIMode == AI_MODE_TRANSLATE)
-    {
+    if (mAIConfig.get(AI_FEATURES_ON).asBoolean() && translationModeOn())
+    {   // Do outgoing translation
         if (mLastChatTimer.hasExpired() && mChatSession.notNull() && (mChatSession != im_session_id))
         { // Conversation went dead, reset for new incoming chat
             resetChat();
@@ -506,7 +516,7 @@ void FSAIChatMgr::processIncomingAIResponse(const std::string& untrimmed_ai_mess
 {   // Just save message data - called from coroutine
     std::string ai_message(untrimmed_ai_message);
     LLStringUtil::trim(ai_message);
-    if (mAIMode == AI_MODE_TRANSLATE && ai_message == "No translation")
+    if (translationModeOn() && ai_message == "No translation")
     {
         LL_WARNS("AIChat") << "Dropping 'No translation' message from AI" << LL_ENDL;
         return;
@@ -562,7 +572,7 @@ void FSAIChatMgr::finallyProcessIncomingAIResponse(const std::string& ai_message
         LL_WARNS("AIChat") << "Unable to get AI chat floater" << LL_ENDL;
     }
 
-    if (mAIMode == AI_MODE_TRANSLATE &&
+    if (translationModeOn() &&
         (ai_message.length() > 5 && ai_message.at(2) == '-' && ai_message.at(5) == ':'))
     {   // Cheap check for fr-en: ISO 639-1 format at start.  To do: support ISO 639-2 or -3 someday
         mLastLanguageCode = ai_message.substr(0,2); // Last language used by other agent when translating
@@ -572,6 +582,8 @@ void FSAIChatMgr::finallyProcessIncomingAIResponse(const std::string& ai_message
     if (!request_direct)
     {   // This skips all the processing for /<number> etc. that's done for local chat
         // Send it!
+
+        // to do - check localTranslationMode() and figure out how to only send locally
         LLIMModel::sendMessage(ai_message, mChatSession, mChattyAgent, IM_NOTHING_SPECIAL);
 
         if (mAIService->saveChatHistory())

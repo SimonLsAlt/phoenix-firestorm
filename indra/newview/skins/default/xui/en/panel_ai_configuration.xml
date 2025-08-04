@@ -117,8 +117,8 @@
          value="share_xlate" />
         <combo_box.item
          label="Private Translator"
-         name="private_xlate"
-         value="private_xlate" />
+         name="local_xlate"
+         value="local_xlate" />
     </combo_box>
 
     <combo_box

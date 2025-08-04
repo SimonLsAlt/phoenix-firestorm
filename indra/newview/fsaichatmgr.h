@@ -78,14 +78,6 @@ public:
     const std::string& getChattyDisplayName() const                  { return mChattyDisplayName; };
     void               setChattyDisplayName(const std::string& name) { mChattyDisplayName = name; };
 
-    typedef enum
-    {
-        AI_MODE_CHAT      = 0, // AI as chat bot
-        AI_MODE_TRANSLATE = 1  // AI as translator
-    } FSAIMode;
-    FSAIMode getAIMode() const            { return mAIMode; };
-    void       setAIMode(FSAIMode mode)   { mAIMode = mode; };
-
     void            idle();     // Regularly called from main loop
 
     void            processIncomingChat(const LLUUID& from_id,
@@ -105,6 +97,9 @@ public:
 
     const ai_chat_history_t& getAIChatHistory() const { return mAIChatHistory; };
 
+    bool translationModeOn() const;
+    bool localTranslationMode() const;
+
   private:
     LLSD            readFullAvatarAISettings();  // Reads the full file possibly with multiple configurations
     void            createAIService(const std::string& ai_service_name);  // Creates service object mAIService
@@ -116,11 +111,7 @@ public:
     std::string     mChattyDisplayName;  // Name of other agent to use in conversation
 
     std::string     mLastLanguageCode;   // Last language used by other agent when translating
-
-    // to do - combine mAIMode with config AI_FEATURES_ON when the UI gets sorted out
-    FSAIMode mAIMode;               // True if doing translations
-    bool mTranslateWarningSent;     // True if warning about translation has been sent
-
+    bool            mTranslateWarningSent;  // True if warning about translation has been sent
 
     FSAIService*      mAIService;        // Interface to external AI chat service
     LLSD              mAIConfig;         // Configuration values for AI back end

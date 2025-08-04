@@ -45,9 +45,11 @@ inline constexpr char AI_APPLY_BTN[] = "apply_btn";
 inline constexpr char AI_SERVICE[]   = "service";
 inline constexpr char AI_LLM_MODE[]  = "llm_mode";
 inline constexpr char AI_TARGET_LANGUAGE[] = "target_language";
-inline constexpr char AI_MODE_XLATE[] = "xlate";
-inline constexpr char AI_DEFAULT_MODE[] = "character_chat";
 inline constexpr char AI_DEFAULT_LANGUAGE[] = "en";
+inline constexpr char AI_MODE_CHAT[] = "character_chat";
+inline constexpr char AI_MODE_XLATE[] = "share_xlate";
+inline constexpr char AI_MODE_XLATE_LOCAL[] = "private_xlate";
+
 
 // Names of supported AI back-ends, must match up with panel_ai_configuration.xml combo box values
 inline constexpr char LLM_CONVAI[]   = "Convai";
